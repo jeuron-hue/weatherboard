@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Automated weather readings for the east side of Singapore: Bedok, Tampines, Changi. Five a day.">
+<title>East Sky Board</title>
+<!--
+  East Sky Board, static site build.
+  SOURCE OF RECORD for the GitHub Pages site. Edit THIS file.
+  The claude.ai artifact at /code/artifact/4c1d04e1-5460-46bd-b8bf-484d150562ec is
+  FROZEN as of 08/09/26 and is no longer updated; it stays only as a fallback view.
+
+  Data: a scheduled cloud-only run reads the artifact database, writes data.json
+  beside this file and pushes both through the GitHub Contents API. This page
+  fetches data.json; it has no live subscription and says so when the file is old.
+
+  08/09/26  Forked from the artifact source after the plain-language rewrite.
+            Loader swapped from window.claude database to a data.json fetch,
+            re-fetch every 5 min, plus two banners the artifact never needed:
+            data file unreachable, and data file older than 90 min.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#EEF2F1; --surface:#FFFFFF; --surface-2:#F6F8F7;
+  --ink:#172220; --ink-2:#4A5955; --muted:#7A8985; --line:#D5DDDA; --line-2:#E6ECEA;
+  --accent:#0E6F7E; --accent-ink:#FFFFFF;
+  --good:#237A4A; --good-bg:#E3F2E9;
+  --warn:#A8690F; --warn-bg:#FBEFD8;
+  --crit:#B2382C; --crit-bg:#F9E3E0;
+  --dim:#66716E; --dim-bg:#E9ECEB;
+  --shadow:0 1px 2px rgba(23,34,32,.06), 0 6px 18px rgba(23,34,32,.05);
+  --fd:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;
+  --fb:"IBM Plex Sans","Segoe UI",Helvetica,Arial,sans-serif;
+  --fm:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1414; --surface:#161E1D; --surface-2:#1C2625;
+    --ink:#E4EBE9; --ink-2:#B4C0BC; --muted:#8A9995; --line:#2B3735; --line-2:#222D2B;
+    --accent:#4FB5C3; --accent-ink:#0B1516;
+    --good:#5CC287; --good-bg:#16302270;
+    --warn:#E0A63C; --warn-bg:#3A2B0F70;
+    --crit:#EB6B5B; --crit-bg:#3E1B1770;
+    --dim:#9AA6A2; --dim-bg:#26302E;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1414; --surface:#161E1D; --surface-2:#1C2625;
+  --ink:#E4EBE9; --ink-2:#B4C0BC; --muted:#8A9995; --line:#2B3735; --line-2:#222D2B;
+  --accent:#4FB5C3; --accent-ink:#0B1516;
+  --good:#5CC287; --good-bg:#16302270;
+  --warn:#E0A63C; --warn-bg:#3A2B0F70;
+  --crit:#EB6B5B; --crit-bg:#3E1B1770;
+  --dim:#9AA6A2; --dim-bg:#26302E;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--fb);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+.wrap{max-width:1200px;margin:0 auto;padding:16px 20px 48px}
+@media (max-width:720px){.wrap{padding:10px 12px 40px}.routechip{display:none}}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;padding:6px 2px 12px;border-bottom:1px solid var(--line)}
+@media (max-width:720px){header h1{font-size:19px}header h1 span{display:block;font-size:13px;margin-top:2px}}
+header h1{font-family:var(--fd);font-weight:700;font-size:22px;letter-spacing:.01em;margin:0}
+header h1 span{color:var(--muted);font-weight:500}
+.hright{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.clock{font-family:var(--fm);font-size:13px;color:var(--ink-2)}
+.clock b{color:var(--ink);font-weight:500}
+.eyebrow{font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+
+/* plain / full detail switch */
+.dtoggle{font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+  padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);
+  cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.dtoggle:hover{border-color:var(--accent);color:var(--ink)}
+.dtoggle .sw{width:22px;height:12px;border-radius:999px;background:var(--dim-bg);position:relative;flex:none;transition:background .15s}
+.dtoggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:8px;height:8px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+.dtoggle[aria-pressed="true"]{border-color:var(--accent);color:var(--ink)}
+.dtoggle[aria-pressed="true"] .sw{background:var(--accent)}
+.dtoggle[aria-pressed="true"] .sw::after{transform:translateX(10px);background:var(--accent-ink)}
+
+.banner{display:none;margin:14px 0 0;padding:10px 14px;border-left:4px solid var(--crit);background:var(--crit-bg);color:var(--ink);border-radius:0 6px 6px 0;font-size:14px}
+.banner.warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.banner.show{display:block}
+.banner b{font-family:var(--fd);letter-spacing:.04em;text-transform:uppercase;font-size:12px;margin-right:8px}
+
+/* lean */
+.lean{margin-top:16px;background:var(--surface);border-radius:8px;box-shadow:var(--shadow);display:grid;grid-template-columns:6px 1fr;overflow:hidden}
+.lean .stripe{background:var(--dim)}
+.lean[data-conf="high"] .stripe{background:var(--good)}
+.lean[data-conf="mod-high"] .stripe{background:linear-gradient(var(--good) 50%,var(--warn) 50%)}
+.lean[data-conf="moderate"] .stripe{background:var(--warn)}
+.lean[data-conf="low"] .stripe,.lean[data-conf="degraded"] .stripe{background:var(--crit)}
+.lean .body{padding:16px 20px 18px}
+@media (max-width:720px){.lean .body{padding:14px 14px 16px}.lean .call{font-size:22px;max-width:none}.lean .top{gap:6px 8px}}
+.lean .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.lean .call{font-family:var(--fd);font-weight:600;font-size:clamp(22px,2.6vw,34px);line-height:1.18;text-wrap:balance;margin:0;max-width:none}
+.lean .conf{margin-top:10px;font-size:14px;color:var(--ink-2)}
+.lean .conf b{color:var(--ink);font-weight:600}
+.lean .sure{margin-top:10px;font-size:14px;color:var(--ink-2)}
+.lean .sure b{color:var(--ink);font-weight:600}
+.unres{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.unres ul{margin:4px 0 0;padding-left:18px;color:var(--ink-2);font-size:14px}
+.unres li{margin:2px 0}
+.next{margin-top:8px;font-size:13px;color:var(--muted)}
+.next b{color:var(--ink-2);font-weight:500}
+
+/* "show the working" folds: every technical string and raw number lives in one */
+details.work{margin-top:11px;padding-top:9px;border-top:1px dashed var(--line)}
+details.work>summary{cursor:pointer;list-style:none;font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px}
+details.work>summary::-webkit-details-marker{display:none}
+details.work>summary::before{content:"";width:0;height:0;border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;flex:none;transition:transform .15s}
+details.work[open]>summary::before{transform:rotate(90deg)}
+details.work>summary:hover{color:var(--ink-2)}
+.workbody{margin-top:9px;font-size:13px;color:var(--ink-2);line-height:1.5}
+.workbody p{margin:0 0 8px}
+.workbody p:last-child{margin-bottom:0}
+.workbody b{color:var(--ink);font-weight:600}
+.workbody ul{margin:4px 0 8px;padding-left:17px}
+.workbody li{margin:2px 0}
+.workbody .kv{font-size:13px;margin-bottom:8px}
+.lead{font-size:15px;color:var(--ink)}
+.lead.q{color:var(--ink-2);font-size:14px}
+
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--dim-bg);color:var(--dim);white-space:nowrap}
+.chip.good{background:var(--good-bg);color:var(--good)}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.crit{background:var(--crit-bg);color:var(--crit)}
+.chip.kind{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.mono{font-family:var(--fm);font-variant-numeric:tabular-nums}
+.age{font-family:var(--fm);font-size:12px;color:var(--muted)}
+.age.old{color:var(--warn)}
+.age.dead{color:var(--crit)}
+
+/* tiles */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+.grid.three{grid-template-columns:1fr 1fr 1.25fr;align-items:start}
+@media (max-width:1000px){.grid.three{grid-template-columns:repeat(2,1fr)}.grid.three .tile:last-child{grid-column:1/-1}}
+@media (max-width:720px){.grid,.grid.three{grid-template-columns:1fr}}
+.foot{font-size:12px;color:var(--muted);margin-top:auto;padding-top:6px;border-top:1px dashed var(--line-2)}
+.tile{background:var(--surface);border-radius:8px;box-shadow:var(--shadow);padding:14px 16px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+@media (max-width:720px){.tile{padding:12px 14px}.big{font-size:30px}.bigrow{gap:16px}.kv{row-gap:5px}}
+.tile .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.tile .head .eyebrow{color:var(--ink-2)}
+.kv{display:grid;grid-template-columns:auto 1fr;column-gap:14px;row-gap:3px;font-size:14px;align-items:baseline}
+.kv .k{color:var(--muted);font-size:13px;white-space:nowrap}
+.kv .v{font-family:var(--fm);font-variant-numeric:tabular-nums;color:var(--ink);overflow-wrap:anywhere}
+.kv .v.words{font-family:var(--fb);font-variant-numeric:normal}
+.kv .v small{color:var(--muted);font-family:var(--fb);font-size:12px}
+.big{font-family:var(--fd);font-weight:700;font-size:34px;line-height:1;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.big.word{font-size:26px;letter-spacing:0}
+.big small{font-family:var(--fb);font-weight:400;font-size:13px;color:var(--muted);letter-spacing:0;margin-left:4px}
+.bigrow{display:flex;gap:22px;align-items:flex-end;flex-wrap:wrap}
+.bigrow .lbl{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.gate{font-family:var(--fd);font-weight:700;font-size:15px;letter-spacing:.04em}
+.negs{display:flex;flex-direction:column;gap:4px;font-size:14px}
+.neg{display:flex;align-items:center;gap:8px}
+.neg i{display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font-style:normal;font-size:12px;font-weight:700;flex:none}
+.neg.ok i{background:var(--good-bg);color:var(--good)}
+.neg.bad i{background:var(--crit-bg);color:var(--crit)}
+.neg.na i{background:var(--dim-bg);color:var(--dim)}
+.spark{display:flex;align-items:flex-end;gap:3px;height:34px;margin-top:2px}
+.spark div{flex:1;background:var(--accent);opacity:.35;border-radius:2px 2px 0 0;min-height:2px}
+.spark div:last-child{opacity:1}
+.sparklbl{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);font-family:var(--fm);white-space:nowrap}
+.sparklbl span:nth-child(2){font-family:var(--fb);overflow:hidden;text-overflow:ellipsis}
+.compass{display:inline-block;width:14px;height:14px;vertical-align:-2px;margin-right:4px}
+
+/* record */
+.strip{display:flex;gap:4px;flex-wrap:wrap}
+@media (max-width:720px){.sq{width:28px;height:28px;font-size:13px}.strip{gap:5px}}
+.sq{width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:700;font-size:11px;background:var(--dim-bg);color:var(--dim);position:relative}
+.sq.hit{background:var(--good-bg);color:var(--good)}
+.sq.miss{background:var(--crit-bg);color:var(--crit)}
+.sq.partial{background:var(--warn-bg);color:var(--warn)}
+.sq.day{border-bottom:2px solid var(--line)}
+.legend{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.legend span b{font-family:var(--fd)}
+.scorenote{font-size:13px;color:var(--ink-2)}
+.scorenote b{font-weight:600;color:var(--ink)}
+
+/* collapsed earlier-runs block */
+details.earlier{margin-top:10px;background:var(--surface);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+details.earlier>summary{cursor:pointer;list-style:none;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--ink)}
+details.earlier>summary::-webkit-details-marker{display:none}
+details.earlier>summary::before{content:"";width:0;height:0;border-left:6px solid var(--muted);border-top:4px solid transparent;border-bottom:4px solid transparent;flex:none;transition:transform .15s}
+details.earlier[open]>summary::before{transform:rotate(90deg)}
+details.earlier>summary b{font-family:var(--fd);font-weight:600}
+details.earlier>summary .tally{margin-left:auto;font-family:var(--fm);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+details.earlier>summary:hover{background:var(--surface-2)}
+details.earlier .tablewrap{box-shadow:none;border-radius:0;border-top:1px solid var(--line)}
+
+/* system health */
+.hrow{display:flex;align-items:center;gap:10px;font-size:14px;padding:5px 0;border-bottom:1px dashed var(--line-2);flex-wrap:wrap}
+.hrow:last-of-type{border-bottom:0}
+.hrow i{display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font-style:normal;font-size:12px;font-weight:700;flex:none}
+.hrow.ok i{background:var(--good-bg);color:var(--good)}
+.hrow.bad i{background:var(--crit-bg);color:var(--crit)}
+.hrow.na i{background:var(--dim-bg);color:var(--dim)}
+.hrow .lbl{flex:1;min-width:140px}
+.hrow .val{font-family:var(--fm);font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+/* history */
+section.hist{margin-top:20px}
+.hist h2{font-family:var(--fd);font-size:16px;font-weight:600;margin:0 0 8px;letter-spacing:.02em}
+.tablewrap{overflow-x:auto;background:var(--surface);border-radius:8px;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
+th{font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.when{font-family:var(--fm);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-2)}
+td.lean-cell{max-width:46ch}
+td.lean-cell details summary{cursor:pointer;list-style:none;color:var(--ink);padding:2px 0}
+td.lean-cell details summary::-webkit-details-marker{display:none}
+td.lean-cell details[open] summary{color:var(--muted);font-size:13px}
+td.lean-cell details div{margin-top:6px;font-size:13px;color:var(--ink-2);white-space:pre-wrap}
+.empty{background:var(--surface);border-radius:8px;box-shadow:var(--shadow);padding:22px;color:var(--ink-2);font-size:14px;margin-top:16px}
+.empty code{font-family:var(--fm);font-size:13px;background:var(--surface-2);padding:1px 5px;border-radius:3px}
+@media (max-width:720px){
+  table{min-width:0}
+  thead{display:none}
+  tbody tr{display:grid;grid-template-columns:auto auto 1fr;gap:6px 8px;padding:10px 12px;border-bottom:1px solid var(--line-2);align-items:center}
+  tbody td{display:block;padding:0;border:0}
+  td.when{grid-column:1}
+  td.kindc{grid-column:2}
+  td.confc{grid-column:3;justify-self:end}
+  td.lean-cell{grid-column:1/-1;max-width:none}
+  td.scorec{grid-column:1/-1}
+  td.scorec:empty{display:none}
+}
+footer{margin-top:22px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+footer .mono{color:var(--ink-2)}
+@media (prefers-reduced-motion: no-preference){.tile,.lean{transition:box-shadow .2s}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>East Sky Board <span>· Bedok · Tampines · Changi</span></h1>
+    <div class="hright">
+      <button class="dtoggle" id="dtoggle" type="button" aria-pressed="false"><span class="sw"></span>Show the working</button>
+      <div class="clock">SGT <b id="clock">--:--</b> hrs · <span id="date"></span></div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <div id="app">
+    <div class="empty" id="loading">Loading the latest readings…</div>
+  </div>
+
+  <footer>
+    <span>Five readings a day: 0700 day-ahead, 1045 mid-morning, 1400 convection, 1745 evening, 2100 night, with a backup sweep behind each. Automated, unattended. Photos never inform a precipitation call. This page is a published copy, rewritten after each reading.</span>
+    <span class="mono" id="storeinfo"></span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  const pad=n=>String(n).padStart(2,'0');
+  const SGT=8*60;
+  let ROWS=null, HB=undefined; // HB undefined = not loaded yet, null = absent
+
+  // Plain by default. The technical layer is one click away and the choice sticks
+  // per browser. Every fold below renders open when this is true.
+  let DETAIL=false;
+  try{ DETAIL=localStorage.getItem('esb-detail')==='1'; }catch(e){ DETAIL=false; }
+
+  function sgtNow(){ const d=new Date(); return new Date(d.getTime()+(d.getTimezoneOffset()+SGT)*60000); }
+  function tickClock(){ const n=sgtNow(); $('#clock').textContent=pad(n.getHours())+pad(n.getMinutes());
+    $('#date').textContent=pad(n.getDate())+'/'+pad(n.getMonth()+1)+'/'+String(n.getFullYear()).slice(2); }
+  tickClock(); setInterval(tickClock,15000);
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function fmtAge(ms){ if(ms==null||isNaN(ms)) return '';
+    const m=Math.round(ms/60000); if(m<1) return 'now'; if(m<60) return m+' min';
+    const h=Math.floor(m/60), mm=m%60; if(h<48) return h+' h '+pad(mm)+' min'; return Math.floor(h/24)+' d'; }
+  function ageClass(ms,warnH,deadH){ const h=ms/3600000; return h>deadH?'dead':h>warnH?'old':''; }
+  function dmy(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return d+'/'+m+'/'+y.slice(2); }
+  function confClass(c){ c=String(c||'').toLowerCase();
+    if(c.startsWith('high')) return 'high'; if(c.includes('mod')&&c.includes('high')) return 'mod-high';
+    if(c.startsWith('mod')) return 'moderate'; if(c.includes('degrad')) return 'degraded'; if(c.startsWith('low')) return 'low'; return 'unknown'; }
+  function chipFor(cl){ return {high:'good','mod-high':'good',moderate:'warn',low:'crit',degraded:'crit',unknown:''}[cl]||''; }
+  function verdictClass(v){ v=String(v||'').toLowerCase(); if(v.startsWith('hit')||v.startsWith('verif')) return 'hit'; if(v.startsWith('miss')||v.startsWith('fail')) return 'miss'; if(v.startsWith('part')) return 'partial'; return 'unscored'; }
+  function compass(deg){ if(deg==null) return '';
+    return '<svg class="compass" viewBox="0 0 16 16" aria-hidden="true"><g transform="rotate('+(deg)+' 8 8)"><path d="M8 1.5 L11 9 L8 7.5 L5 9 Z" fill="currentColor"/><path d="M8 7.5 L11 9 L8 14.5 L5 9 Z" fill="currentColor" opacity=".35"/></g></svg>'; }
+  function dirName(d){ if(d==null) return ''; const n=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']; return n[Math.round(d/22.5)%16]; }
+  const LONGDIR={N:'north',NNE:'north-northeast',NE:'northeast',ENE:'east-northeast',E:'east',ESE:'east-southeast',
+                 SE:'southeast',SSE:'south-southeast',S:'south',SSW:'south-southwest',SW:'southwest',WSW:'west-southwest',
+                 W:'west',WNW:'west-northwest',NW:'northwest',NNW:'north-northwest'};
+  function dirLong(d){ if(d==null) return ''; return LONGDIR[dirName(d)]||dirName(d); }
+  function runTs(r){ const t=r.ts?new Date(r.ts):null; return t&&!isNaN(t)?t:null; }
+  const KINDS={'day-ahead':{lbl:'0700 day-ahead',sh:'0700'},'mid-morning':{lbl:'1045 mid-morning',sh:'1045'},
+               'convection':{lbl:'1400 convection',sh:'1400'},'evening':{lbl:'1745 evening',sh:'1745'},
+               'night':{lbl:'2100 night',sh:'2100'}};
+  function label(r){ return (KINDS[r.kind]||KINDS['day-ahead']).lbl; }
+  function shortKind(r){ return (KINDS[r.kind]||KINDS['day-ahead']).sh; }
+  // which run follows each kind, and roughly when it files
+  const NEXT={'day-ahead':{k:'mid-morning',h:10,m:50,at:'1045'},'mid-morning':{k:'convection',h:14,m:5,at:'1401'},
+              'convection':{k:'evening',h:17,m:50,at:'1745'},'evening':{k:'night',h:21,m:5,at:'2101'},
+              'night':{k:'day-ahead',h:7,m:15,at:'0711',nextDay:true}};
+  function nextOf(r){ return NEXT[r.kind]||NEXT['day-ahead']; }
+
+  // Expected next run after a reading, SGT wall clock
+  function nextExpected(r){ const t=runTs(r); if(!t) return null;
+    const nx=nextOf(r);
+    const n=new Date(t.getTime()+(t.getTimezoneOffset()+SGT)*60000); // shift to SGT wall clock
+    if(nx.nextDay) n.setDate(n.getDate()+1);
+    n.setHours(nx.h,nx.m,0,0);
+    return new Date(n.getTime()-(t.getTimezoneOffset()+SGT)*60000); }
+
+  function ageText(minOrIso,base){ let ms=null;
+    if(typeof minOrIso==='number') ms=minOrIso*60000+(base?Date.now()-base.getTime():0);
+    else if(minOrIso){ const d=new Date(minOrIso); if(!isNaN(d)) ms=Date.now()-d.getTime(); }
+    return ms==null?'age n/a':fmtAge(ms)+' old'; }
+  function nextRunText(r){ const nx=nextExpected(r); if(!nx) return 'unknown';
+    const w=new Date(nx.getTime()+(nx.getTimezoneOffset()+SGT)*60000);
+    const cfg=nextOf(r), lab=KINDS[cfg.k].lbl.replace(/^(\d{4})/,'$1 hrs');
+    const dstr=pad(w.getDate())+'/'+pad(w.getMonth()+1)+'/'+String(w.getFullYear()).slice(2);
+    const rel=nx.getTime()-Date.now();
+    return lab+', about '+cfg.at+' hrs '+dstr+(rel>0?' (in '+fmtAge(rel)+')':' (overdue)'); }
+
+  // ---- plain-language layer -------------------------------------------------
+  // Nothing here invents information. Each function turns a value the reading
+  // already wrote into the sentence a non-specialist would use for it. The
+  // original number or phrase always survives verbatim inside the fold.
+
+  // conf_level is a fixed five-value vocabulary, so a plain reading of it needs
+  // no change to any reading prompt.
+  const CONFPLAIN={high:'Solid call. Worth planning around.',
+                   'mod-high':'Fairly solid. Small chance it shifts.',
+                   moderate:'A lean, not a promise. Could go either way by a bit.',
+                   low:'Weak call. Easily wrong.',
+                   degraded:'Shaky, because some of the instruments could not be read this time.'};
+  function plainConf(cl){ return CONFPLAIN[cl]||'How sure this call is was not stated.'; }
+
+  function plainSteady(R){ if(R==null) return null;
+    return R>=0.85?'blowing much the same way right across the island'
+         : R>=0.6 ?'broadly one direction, with some local variation'
+         :'stations disagree with each other, so the direction does not mean much'; }
+
+  function plainWind(w){
+    if(w.mean_kmh==null&&w.dir_deg==null) return 'Wind was not read this run.';
+    const from=w.dir_deg!=null?'From the '+dirLong(w.dir_deg):'Direction not read';
+    // whole km/h in the plain layer; the exact figure survives in the fold
+    const at=w.mean_kmh!=null?' at about '+Math.round(w.mean_kmh)+' km/h':'';
+    const pk=w.peak_kmh!=null?', strongest '+Math.round(w.peak_kmh)+' km/h'+(w.peak_station?' at '+w.peak_station:''):'';
+    return from+at+pk+'.'; }
+
+  const WINDOWPLAIN={'past 30 min':'the past half hour','past 1 hr':'the past hour','past 2 hr':'the past two hours',
+                     'since midnight':'today so far'};
+  function plainWindow(s){ if(!s) return 'the past hour'; return WINDOWPLAIN[String(s).toLowerCase()]||('the '+s); }
+
+  function plainRain(rn){
+    if(rn.wet==null) return 'The rain gauges were not read this run.';
+    const win=plainWindow(rn.window), n=rn.n!=null?rn.n:'the';
+    if(rn.wet===0&&rn.wet_midnight===0) return 'No rain at any of the '+n+' gauges on the island in '+win+', and none anywhere since midnight.';
+    if(rn.wet===0) return 'No rain at any of the '+n+' gauges in '+win+(rn.wet_midnight?', though '+rn.wet_midnight+' recorded some earlier today':'')+'.';
+    return rn.wet+' of '+n+' gauges caught rain in '+win+(rn.highest_1h?', the wettest being '+rn.highest_1h:'')+'.'; }
+
+  function plainNowcast(nc){
+    if(nc.nonfair==null) return null;
+    const tot=nc.total||47;
+    const head=nc.nonfair===0?'Fair weather forecast for all '+tot+' towns over the next two hours'
+                             :'Rain forecast in '+nc.nonfair+' of '+tot+' towns over the next two hours';
+    return head+(nc.east?'. East side: '+nc.east:'')+'.'; }
+
+  // echo_pct is the share of the 50 km map carrying an echo. The bands below are
+  // descriptive only and never change the call.
+  function plainCover(pct){
+    if(pct==null) return 'not measured';
+    return pct<0.5?'Almost nothing'
+         : pct<2 ?'A few patches'
+         : pct<8 ?'Scattered rain'
+         : pct<20?'A fair bit of rain'
+         :'Widespread rain'; }
+
+  const BANDPLAIN={'light':'light','lightest':'very light','mod':'moderate','moderate':'moderate',
+                   'mod-heavy':'moderate to heavy','heavy':'heavy','v-heavy':'very heavy','extreme':'very heavy'};
+  function plainBand(l){ if(!l) return ''; return BANDPLAIN[String(l).toLowerCase()]||String(l); }
+
+  function plainNear(km,brg,lab){
+    if(km==null) return 'nothing on the map';
+    return km+' km to the '+dirLong(brg)+(lab?', '+plainBand(lab)+' rain':''); }
+
+  // Haze. NEA 1-hr PM2.5 bands, read off haze.gov.sg 04/09/26:
+  // 0 to 55 Normal, 56 to 150 Elevated, 151 to 250 High, 251 and above Very High.
+  function pmBand(v){ if(v==null||isNaN(v)) return null;
+    return v<=55?{n:1,d:'Normal',c:'good'}:v<=150?{n:2,d:'Elevated',c:'warn'}:v<=250?{n:3,d:'High',c:'crit'}:{n:4,d:'Very High',c:'crit'}; }
+  // NEA 24-hr PSI bands.
+  function psiBand(v){ if(v==null||isNaN(v)) return null;
+    return v<=50?{d:'Good',c:'good'}:v<=100?{d:'Moderate',c:'warn'}:v<=200?{d:'Unhealthy',c:'crit'}:v<=300?{d:'Very Unhealthy',c:'crit'}:{d:'Hazardous',c:'crit'}; }
+  function hazeNotable(hz){ if(!hz) return false; const b=pmBand(hz.pm25_1h_east), p=psiBand(hz.psi_east);
+    return (b&&b.n>=2)||(p&&p.c==='crit'); }
+  function ageSpan(minOrIso,base){ let ms=null;
+    if(typeof minOrIso==='number') ms=minOrIso*60000+(base?Date.now()-base.getTime():0);
+    else if(minOrIso) { const d=new Date(minOrIso); if(!isNaN(d)) ms=Date.now()-d.getTime(); }
+    if(ms==null) return '<span class="age">age n/a</span>';
+    return '<span class="age">'+fmtAge(ms)+' old</span>'; }
+
+  // one fold, used by every panel
+  function work(inner){ if(!inner) return '';
+    return '<details class="work"'+(DETAIL?' open':'')+'><summary>Show the working</summary><div class="workbody">'+inner+'</div></details>'; }
+  function wrow(k,v){ return v==null||v===''?'':'<span class="k">'+k+'</span><span class="v">'+v+'</span>'; }
+
+  // System health: the audit heartbeat is the only proof the watchdog is alive.
+  const HB_STALE_H=26;
+  function hbAge(){ if(!HB||!HB.ts) return null; const d=new Date(HB.ts); return isNaN(d)?null:Date.now()-d.getTime(); }
+  function hbState(){ if(HB===undefined) return 'loading'; if(!HB||!HB.ts) return 'absent';
+    const a=hbAge(); if(a==null) return 'absent';
+    if(a>HB_STALE_H*3600000) return 'stale';
+    return HB.verdict==='FAIL'||HB.fleet_ok===false?'failing':'ok'; }
+
+  // Five readings a day fills the log fast, so only today stays open.
+  function sgtDateStr(d){ const x=new Date(d.getTime()+(d.getTimezoneOffset()+SGT)*60000);
+    return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate()); }
+  function todayStr(){ return sgtDateStr(new Date()); }
+
+  function hazeTile(hz,t){
+    if(!hz || (hz.pm25_1h_east==null && hz.psi_east==null)) return `
+    <div class="grid" style="grid-template-columns:1fr">
+      <div class="tile">
+        <div class="head"><span class="eyebrow">Haze</span><span class="age">not read</span></div>
+        <div class="lead">The latest run did not read the air quality products, so there is no number to show.</div>
+        <div class="foot">Source is the NEA PSI and 1 hr PM2.5 endpoints. A run that cannot reach them says so rather than guessing a number.</div>
+      </div>
+    </div>`;
+    const b=pmBand(hz.pm25_1h_east), p=psiBand(hz.psi_east), bw=pmBand(hz.pm25_1h_max), pw=psiBand(hz.psi_max);
+    const workInner=
+      '<div class="kv">'
+      + wrow('East 1 hr PM2.5', hz.pm25_1h_east!=null?hz.pm25_1h_east+' ug/m3'+(b?' <small>band '+b.n+', '+b.d+'</small>':''):'–')
+      + wrow('East 24 hr PSI', hz.psi_east!=null?hz.psi_east+(p?' <small>'+p.d+'</small>':''):'–')
+      + wrow('Island worst PM2.5', hz.pm25_1h_max!=null?hz.pm25_1h_max+' ug/m3'+(hz.pm25_1h_max_region?', '+esc(hz.pm25_1h_max_region):'')+(bw?' <small>'+bw.d+'</small>':''):'–')
+      + wrow('Island worst PSI', hz.psi_max!=null?hz.psi_max+(hz.psi_max_region?', '+esc(hz.psi_max_region):'')+(pw?' <small>'+pw.d+'</small>':''):'–')
+      + '</div>'
+      + '<p>NEA 1 hr PM2.5 bands, ug/m3: up to 55 normal, 56 to 150 elevated, 151 to 250 high, 251 and above very high. '
+      + 'The 1 hr figure responds within the hour; the 24 hr PSI is an average and lags. Haze is not a rain input and never changes the rain call.</p>';
+    return `
+    <div class="grid" style="grid-template-columns:1fr">
+      <div class="tile">
+        <div class="head"><span class="eyebrow">Air on the east side</span>${ageSpan(hz.stamp||hz.age_min,t)}</div>
+        <div class="bigrow">
+          <div><span class="big word" style="${b?'color:var(--'+b.c+')':''}">${b?esc(b.d):'–'}</span><span class="lbl">smoke and dust in the air right now${hz.pm25_1h_east!=null?' ('+hz.pm25_1h_east+' ug/m3)':''}</span></div>
+          <div><span class="big word" style="${p?'color:var(--'+p.c+')':''}">${p?esc(p.d):'–'}</span><span class="lbl">air quality averaged over the day${hz.psi_east!=null?' (PSI '+hz.psi_east+')':''}</span></div>
+        </div>
+        ${hz.note?'<div class="lead q">'+esc(hz.note)+'</div>':''}
+        ${work(workInner)}
+        <div class="foot">The first number says what the air is doing now, the second what the whole day has been like. Smoke reaching Singapore comes from Sumatra and Kalimantan on the low-level wind, so the wind panel above says whether it can get here.</div>
+      </div>
+    </div>`;
+  }
+
+  function healthSection(rows,latest){
+    const st=hbState(), a=hbAge();
+    const recCount=rows.filter(r=>r.recovery).length;
+    const nx=nextExpected(latest), rel=nx?nx.getTime()-Date.now():null;
+    const line=(cls,icon,lbl,val)=>'<div class="hrow '+cls+'"><i>'+icon+'</i><span class="lbl">'+lbl+'</span><span class="val">'+val+'</span></div>';
+    let auditRow;
+    if(st==='loading') auditRow=line('na','?','Daily self-check, 0805 hrs','checking');
+    else if(st==='absent') auditRow=line('bad','!','Daily self-check, 0805 hrs','never reported');
+    else if(st==='stale') auditRow=line('bad','!','Daily self-check, 0805 hrs','silent '+fmtAge(a));
+    else if(st==='failing') auditRow=line('bad','!','Daily self-check, 0805 hrs',esc(HB.verdict||'FAIL')+', '+fmtAge(a)+' ago');
+    else auditRow=line('ok','✓','Daily self-check, 0805 hrs','pass, '+fmtAge(a)+' ago');
+    return `
+    <section class="hist">
+      <h2>Is this thing still working</h2>
+      <div class="tile">
+        <div class="head"><span class="eyebrow">Automation health</span><span class="age">${HB&&HB.ts?'last checked '+esc(String(HB.ts).slice(0,16).replace('T',' ')):''}</span></div>
+        ${auditRow}
+        ${line(rel==null?'na':(rel>-45*60000?'ok':'bad'), rel==null?'?':(rel>-45*60000?'✓':'!'), 'Next reading due', rel==null?'unknown':(rel>0?'in '+fmtAge(rel):fmtAge(-rel)+' overdue'))}
+        ${line(recCount?'na':'ok', recCount?'~':'✓', 'Readings the backup had to fill in', recCount?recCount+' of the last '+rows.length:'none needed')}
+        ${HB&&HB.note?'<div class="foot">'+esc(HB.note)+'</div>':''}
+        <div class="foot">Five readings a day, a backup sweep 30 to 60 min behind each, and a daily self-check at 0805 hrs that also inspects the eight scheduled tasks themselves. The self-check reports every morning, pass or fail. Silence for more than 26 hours means the checker itself has stopped.</div>
+      </div>
+    </section>`;
+  }
+
+  function syncToggle(){ const tg=$('#dtoggle'); if(!tg) return;
+    tg.setAttribute('aria-pressed',DETAIL?'true':'false');
+    tg.lastChild.nodeValue=DETAIL?'Hide the working':'Show the working'; }
+  syncToggle();
+
+  function render(){
+    const rows=ROWS; if(!rows) return;
+    const app=$('#app'); const banner=$('#banner'); banner.className='banner';
+    syncToggle();
+    if(!rows.length){ app.innerHTML='<div class="empty">No readings in the store yet. Each scheduled run writes one document to <code>readings/&lt;date&gt;-&lt;time&gt;-&lt;kind&gt;</code> as its last step.</div>'; return; }
+    rows.sort((a,b)=>String(b.ts||b.id).localeCompare(String(a.ts||a.id)));
+    const latest=rows[0]; const t=runTs(latest); const age=t?Date.now()-t.getTime():null;
+    const o=latest.obs||{}; const w=o.wind||{}, rn=o.rain||{}, rd=o.radar||{}, lt=o.lightning||{}, nc=o.nowcast||{};
+    const cc=confClass(latest.conf_level||latest.confidence);
+
+    // banner, most severe first: missed run, then degraded, then a silent audit
+    const nx=nextExpected(latest); const st=hbState(); const ga=genAge();
+    if(FETCH_ERR){
+      banner.classList.add('show'); banner.innerHTML='<b>Not refreshing</b>The data file could not be loaded ('+esc(FETCH_ERR)+'). Everything below is whatever was last read and may be well out of date.';
+    } else if(ga!=null && ga>FREEZE_H*3600000){
+      banner.classList.add('show'); banner.innerHTML='<b>Page frozen</b>The data file was last written '+fmtAge(ga)+' ago, longer than the '+FREEZE_H+' hr overnight gap between readings. The readings may still be running; what has stopped is the step that publishes them here.';
+    } else if(nx && Date.now()>nx.getTime()+45*60000){
+      banner.classList.add('show'); banner.innerHTML='<b>Run missed</b>The '+KINDS[nextOf(latest).k].lbl+' run expected at '+pad(new Date(nx.getTime()+(nx.getTimezoneOffset()+SGT)*60000).getHours())+pad(new Date(nx.getTime()+(nx.getTimezoneOffset()+SGT)*60000).getMinutes())+' hrs is not showing here. Either that reading did not run, or it ran and the step that publishes this page did not. Showing the last reading, '+fmtAge(age)+' old.';
+    } else if(cc==='degraded'||latest.degraded){
+      banner.classList.add('show','warn'); banner.innerHTML='<b>Degraded</b>'+esc(latest.degraded_reason||'Latest run could not read radar; call rests on text products only.');
+    } else if(st==='stale'||st==='absent'){
+      banner.classList.add('show','warn'); banner.innerHTML='<b>Self-check silent</b>The daily 0805 hrs self-check has not reported '+(st==='absent'?'at all':'for '+fmtAge(hbAge()))+'. Readings below may still be current, but nothing is checking them.';
+    } else if(st==='failing'){
+      banner.classList.add('show','warn'); banner.innerHTML='<b>Self-check failing</b>'+esc(HB.note||'The last daily self-check did not pass. Check the run history.');
+    }
+
+    // track record
+    const hasScore=r=>r.score&&r.score.of&&!/^(none|n\/a|-)$/i.test(String(r.score.of)); const scored=rows.filter(hasScore); const tally={hit:0,miss:0,partial:0,unscored:0};
+    scored.forEach(r=>tally[verdictClass(r.score.verdict)]++);
+    const stripRows=rows.slice(0,28).reverse();
+    const strip=stripRows.map(r=>{ const v=hasScore(r)?verdictClass(r.score.verdict):'none';
+      const ch={hit:'✓',miss:'✕',partial:'~',unscored:'?',none:'·'}[v];
+      const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasScore(r)?' scored '+r.score.of+': '+(r.score.verdict||'')+(r.score.mechanism?' ('+r.score.mechanism+')':''):' (scores nothing)');
+      return '<div class="sq '+(v==='none'?'':v)+(r.kind==='day-ahead'?' day':'')+'" title="'+esc(title)+'">'+ch+'</div>'; }).join('');
+    const lastScore=scored[0];
+
+    // radar spark
+    const trend=Array.isArray(rd.trend_px)?rd.trend_px:[]; const mx=Math.max(1,...trend);
+    const spark=trend.length?'<div class="spark">'+trend.map(v=>'<div style="height:'+Math.max(6,Math.round(v/mx*100))+'%" title="'+v+' dots"></div>').join('')+'</div><div class="sparklbl"><span>'+esc(rd.trend_from||'')+' hrs</span><span>how much rain the radar saw, last half hour</span><span>'+esc(rd.frame||'')+' hrs</span></div>':'';
+
+    // Peak band floor: a label resting on 1 or 2 dots is speckle, not weather.
+    // 04/09/26, the board printed "extreme" off a single magenta pixel out of 65.
+    const pk=rd.peak_px, pl=rd.peak_label;
+    const speckle = pk!=null && pk<=2;
+    // The heaviest band is a property of whatever is on the map, not a headline.
+    // Printed big under "almost nothing showing" it reads as a warning it is not.
+    const peakPlain = pk==null ? 'not measured'
+      : speckle ? 'nothing worth naming, just a stray spot or two'
+      : (plainBand(pl)||'unclassified')+' rain, in the heaviest patch on the map';
+
+    const neg=(val,okText,badText)=> val===true?'<div class="neg ok"><i>✓</i>'+okText+'</div>': val===false?'<div class="neg bad"><i>!</i>'+badText+'</div>':'<div class="neg na"><i>?</i>'+okText+' <small>(not read)</small></div>';
+
+    const nightish=(latest.kind==='evening'||latest.kind==='night');
+    const gate = (latest.kind!=='day-ahead') ? '<div class="gate" style="color:var(--'+(o.gate==='open'?'crit':o.gate==='shut'?'good':'dim')+')">'+(nightish?'Overnight rain trigger: ':'Sea-breeze rain trigger: ')+esc(o.gate==='open'?(nightish?'possible tonight':'possible today'):o.gate==='shut'?(nightish?'ruled out tonight':'ruled out today'):(o.gate||'not stated'))+'</div>' : '';
+
+    // Run log: today expanded, everything older collapsed behind a summary that
+    // carries the verdict counts, so it only needs opening when something looks off.
+    const today=todayStr();
+    const todayRows=rows.filter(r=>r.date===today);
+    const earlierRows=rows.filter(r=>r.date!==today).slice(0,60);
+    const et={hit:0,miss:0,partial:0,unscored:0,none:0,rec:0};
+    earlierRows.forEach(r=>{ et[hasScore(r)?verdictClass(r.score.verdict):'none']++; if(r.recovery) et.rec++; });
+    const earlierTally=[et.hit?et.hit+' hit':'', et.partial?et.partial+' partial':'', et.miss?et.miss+' miss':'',
+                        et.rec?et.rec+' recovery':''].filter(Boolean).join(' · ')||'nothing scored';
+    function logRow(r){ const c=confClass(r.conf_level||r.confidence); const v=hasScore(r)?verdictClass(r.score.verdict):null;
+      return '<tr><td class="when">'+dmy(r.date)+' '+esc(r.time)+'</td><td class="kindc"><span class="chip kind">'+shortKind(r)+'</span>'+(r.recovery?' <span class="chip warn">rec</span>':'')+'</td><td class="confc"><span class="chip '+chipFor(c)+'">'+esc(r.conf_level||c)+'</span></td><td class="lean-cell"><details'+(DETAIL?' open':'')+'><summary>'+esc(r.lean||'')+'</summary><div>'+esc((r.confidence?'Confidence: '+r.confidence+'\n':'')+(Array.isArray(r.unresolved)?r.unresolved.map(u=>'• '+u).join('\n'):'')+(r.route?'\nRoute '+r.route:''))+'</div></details></td><td class="scorec">'+(v?'<span class="chip '+({hit:'good',miss:'crit',partial:'warn',unscored:''}[v])+'">'+esc(r.score.verdict)+'</span>'+(r.score.mechanism?'<div style="font-size:12px;color:var(--muted);margin-top:3px">'+esc(r.score.mechanism)+'</div>':''):'<span class="age">not scored</span>')+'</td></tr>'; }
+    function logTable(rs){ if(!rs.length) return '<div class="empty">No runs filed yet today. The first is the 0700 hrs day-ahead.</div>';
+      return '<div class="tablewrap"><table><thead><tr><th>Run</th><th>Kind</th><th>How sure</th><th>The call</th><th>Marking the run before</th></tr></thead><tbody>'+rs.map(logRow).join('')+'</tbody></table></div>'; }
+
+    // ---- folds: every technical string and raw figure, verbatim -------------
+    const leanWork=
+        (latest.confidence?'<p><b>Confidence.</b> '+esc(latest.confidence)+'</p>':'')
+      + (Array.isArray(latest.unresolved)&&latest.unresolved.length?'<p><b>Unresolved.</b></p><ul>'+latest.unresolved.map(u=>'<li>'+esc(u)+'</li>').join('')+'</ul>':'')
+      + (latest.next_data?'<p><b>What would settle it.</b> '+esc(latest.next_data)+'</p>':'')
+      + (latest.score&&latest.score.of?'<p><b>Marking the previous run.</b> '+esc(latest.score.of)+' → '+esc(latest.score.verdict||'')+(latest.score.mechanism?'. '+esc(latest.score.mechanism):'')+'</p>':'')
+      + (latest.filed?'<p><b>Full reading.</b> <span class="mono">'+esc(latest.filed)+'</span></p>':'');
+
+    const windWork='<div class="kv">'
+      + wrow('Island mean', w.mean_kmh!=null?w.mean_kmh+' km/h <small>18 stations</small>':'–')
+      + wrow('Peak station', w.peak_kmh!=null?w.peak_kmh+' km/h'+(w.peak_station?' <small>'+esc(w.peak_station)+'</small>':''):'–')
+      + wrow('Direction', w.dir_deg!=null?compass(w.dir_deg)+dirName(w.dir_deg)+' <small>'+w.dir_deg+'°, the direction it blows from</small>':'–')
+      + wrow('Coherence R', w.R!=null?w.R+' <small>vector mean over the 18 stations, 1.0 is perfect agreement</small>':'–')
+      + '</div>'
+      + '<p>The trigger line is the convergence gate: sea breezes from opposite coasts colliding inland is what fires most afternoon storms here, and a strong steady gradient wind stops that happening. Shut means the mechanism is unavailable, not that rain is impossible.</p>';
+
+    const rainWork='<div class="kv">'
+      + wrow('Gauges wet', rn.wet!=null?rn.wet+' of '+(rn.n!=null?rn.n:'–')+' <small>'+esc(rn.window||'')+'</small>':'–')
+      + wrow('Wet since midnight', rn.wet_midnight!=null?rn.wet_midnight+' of '+(rn.n!=null?rn.n:'–'):'–')
+      + wrow('Highest 1 hr total', rn.highest_1h?esc(rn.highest_1h):'none anywhere')
+      + wrow('Nowcast', nc.nonfair!=null?nc.nonfair+' of '+(nc.total||47)+' towns not fair':'–')
+      + (rn.east?wrow('East stations',esc(rn.east)):'')
+      + '</div>'
+      + '<p>Gauges are the 68 station rainfall network; the nowcast is the MSS two-hour town forecast, refreshed half-hourly. Lightning is read off the strike map, cloud-to-cloud and cloud-to-ground both.</p>';
+
+    const radarWork='<div class="kv">'
+      + wrow('Echo cover', rd.echo_pct!=null?rd.echo_pct+' % of the map'+(rd.echo_px!=null?' <small>'+rd.echo_px+' px</small>':''):'–')
+      + wrow('Peak band', pl?esc(pl)+(pk!=null?' <small>on '+pk+' px</small>':''):'–')
+      + wrow('Nearest Bedok', rd.bedok_km!=null?rd.bedok_km+' km, bearing '+rd.bedok_brg+'°'+(rd.bedok_label?' <small>'+esc(rd.bedok_label)+'</small>':''):'none')
+      + wrow('Nearest Tampines', rd.tampines_km!=null?rd.tampines_km+' km, bearing '+rd.tampines_brg+'°'+(rd.tampines_label?' <small>'+esc(rd.tampines_label)+'</small>':''):'none')
+      + wrow('Frame', rd.frame?esc(rd.frame)+' hrs'+(rd.trend_from?' <small>trend from '+esc(rd.trend_from)+' hrs</small>':''):'–')
+      + wrow('Trend, px per frame', trend.length?trend.join(' → '):'–')
+      + '</div>'
+      + '<p>50 km product, 217 by 120 px covering about 63 by 35 km, one pixel about 0.29 km. Bands run cyan, green, yellow, orange, red, magenta. A peak band resting on one or two pixels is speckle and is not named. Radar sees rain aloft, which does not always reach the ground.</p>';
+
+    app.innerHTML=`
+    <div class="lean" data-conf="${cc}">
+      <div class="stripe"></div>
+      <div class="body">
+        <div class="top">
+          <span class="chip kind">${esc(label(latest))}</span>
+          ${latest.recovery?'<span class="chip warn">backup run</span>':''}
+          ${hazeNotable(o.haze)?'<span class="chip '+((pmBand(o.haze.pm25_1h_east)||psiBand(o.haze.psi_east)||{c:'warn'}).c)+'">haze '+esc(((pmBand(o.haze.pm25_1h_east)||{}).d||(psiBand(o.haze.psi_east)||{}).d||'').toLowerCase())+'</span>':''}
+          <span class="mono" style="font-size:13px;color:var(--ink-2)">${dmy(latest.date)} ${esc(latest.time)} hrs</span>
+          <span class="age ${age!=null?ageClass(age,9,18):''}">${age!=null?fmtAge(age)+' ago':''}</span>
+          <span class="chip ${chipFor(cc)}"><span class="dot"></span>${esc(latest.conf_level||cc)}</span>
+          ${latest.route?'<span class="age routechip">route '+esc(latest.route)+'</span>':''}
+        </div>
+        <p class="call">${esc(latest.lean||'No lean recorded.')}</p>
+        ${latest.outlook?'<div class="conf">'+esc(latest.outlook)+'</div>':''}
+        <div class="sure"><b>How sure.</b> ${esc(plainConf(cc))}</div>
+        ${work(leanWork)}
+        <div class="next"><b>Next reading:</b> ${nextRunText(latest)}</div>
+      </div>
+    </div>
+
+    <div class="grid three">
+      <div class="tile">
+        <div class="head"><span class="eyebrow">Wind</span>${ageSpan(w.stamp||w.age_min,t)}</div>
+        <div class="lead">${esc(plainWind(w))}</div>
+        ${w.R!=null?'<div class="lead q">It is '+esc(plainSteady(w.R))+'.</div>':''}
+        ${w.note?'<div class="lead q">'+esc(w.note)+'</div>':''}
+        ${gate}
+        ${work(windWork)}
+      </div>
+
+      <div class="tile">
+        <div class="head"><span class="eyebrow">Rain and lightning</span>${ageSpan(rn.stamp||rn.age_min,t)}</div>
+        <div class="lead">${esc(plainRain(rn))}</div>
+        ${plainNowcast(nc)?'<div class="lead q">'+esc(plainNowcast(nc))+'</div>':''}
+        <div class="negs">
+          ${neg(lt.none_detected,'No lightning anywhere','Lightning detected')}
+          ${neg(lt.no_thundery,'No thundery showers forecast','Thundery showers forecast')}
+        </div>
+        ${work(rainWork)}
+      </div>
+
+      <div class="tile">
+        <div class="head"><span class="eyebrow">What the radar sees</span><span class="age">${ageText(rd.stamp||rd.age_min,t)}</span></div>
+        <div class="bigrow">
+          <div><span class="big word">${esc(plainCover(rd.echo_pct))}</span><span class="lbl">showing on the radar around here right now</span></div>
+        </div>
+        <div class="kv">
+          <span class="k">Heaviest of it</span><span class="v words">${esc(peakPlain)}</span>
+          <span class="k">Nearest to Bedok</span><span class="v words">${esc(plainNear(rd.bedok_km,rd.bedok_brg,rd.bedok_label))}</span>
+          <span class="k">Nearest to Tampines</span><span class="v words">${esc(plainNear(rd.tampines_km,rd.tampines_brg,rd.tampines_label))}</span>
+          <span class="k">Heading our way?</span><span class="v words">${esc(rd.motion||'not assessed')}</span>
+          ${rd.upstream?'<span class="k">Anything further out?</span><span class="v words">'+esc(rd.upstream)+'</span>':''}
+        </div>
+        ${spark}
+        ${work(radarWork)}
+      </div>
+    </div>
+
+    ${hazeTile(o.haze,t)}
+
+    <section class="hist">
+      <h2>Run log</h2>
+      ${logTable(todayRows)}
+      ${earlierRows.length?'<details class="earlier"><summary><b>Earlier runs</b> <span>'+earlierRows.length+' more, back to '+dmy(earlierRows[earlierRows.length-1].date)+'</span><span class="tally">'+earlierTally+'</span></summary>'+logTable(earlierRows)+'</details>':''}
+    </section>
+
+    <section class="hist">
+      <h2>Track record</h2>
+      <div class="tile">
+        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${scored.length} scored of ${rows.length} runs</span></div>
+        <div class="bigrow">
+          <div><span class="big" style="color:var(--good)">${tally.hit}</span><span class="lbl">right</span></div>
+          <div><span class="big" style="color:var(--warn)">${tally.partial}</span><span class="lbl">half right</span></div>
+          <div><span class="big" style="color:var(--crit)">${tally.miss}</span><span class="lbl">wrong</span></div>
+          ${tally.unscored?'<div><span class="big" style="color:var(--dim)">'+tally.unscored+'</span><span class="lbl">could not be marked</span></div>':''}
+        </div>
+        <div class="strip">${strip}</div>
+        <div class="legend"><span><b>✓</b> right</span><span><b>~</b> half right</span><span><b>✕</b> wrong</span><span><b>·</b> nothing to mark</span><span>underline = 0700 run</span></div>
+        ${lastScore?'<div class="scorenote"><b>Last marked:</b> '+esc(lastScore.score.of)+' → '+esc(lastScore.score.verdict||'')+(lastScore.score.mechanism?'. '+esc(lastScore.score.mechanism):'')+'</div>':'<div class="scorenote">No run has marked a predecessor yet.</div>'}
+      </div>
+    </section>
+
+    ${healthSection(rows,latest)}`;
+  }
+
+  const tgl=$('#dtoggle');
+  if(tgl) tgl.addEventListener('click',()=>{ DETAIL=!DETAIL;
+    try{ localStorage.setItem('esb-detail',DETAIL?'1':'0'); }catch(e){}
+    render(); });
+
+  // ---- data source -------------------------------------------------------
+  // GitHub Pages is static, so the readings arrive as a file that a scheduled
+  // run rewrites and pushes. There is no live subscription: the page re-fetches
+  // on a timer and says plainly how old the file is, because a push that stops
+  // working would otherwise leave a confident-looking page frozen in the past.
+  const DATA_URL='data.json';
+  // Longest normal gap between pushes is the 2100 to 0700 overnight stretch, 10 hrs.
+  // Anything past 11 means the publish step itself has stopped.
+  const FREEZE_H=11;
+  let GEN=null;              // ISO timestamp the data file was generated
+  let FETCH_ERR=null;
+
+  function genAge(){ if(!GEN) return null; const d=new Date(GEN); return isNaN(d)?null:Date.now()-d.getTime(); }
+  function genWord(){ const a=genAge(); if(a==null) return 'age unknown';
+    return a<60000?'written just now':'written '+fmtAge(a)+' ago'; }
+
+  async function load(){
+    try{
+      const r=await fetch(DATA_URL+'?v='+Date.now(),{cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json();
+      GEN=j.generated||null; HB=j.heartbeat||null; FETCH_ERR=null;
+      ROWS=Array.isArray(j.readings)?j.readings:[];
+      render();
+      $('#storeinfo').textContent=ROWS.length+' readings · data '+genWord();
+    }catch(e){
+      FETCH_ERR=e.message||String(e);
+      if(ROWS===null){ $('#app').innerHTML='<div class="empty">Could not load <code>data.json</code> ('+esc(FETCH_ERR)+
+        '). The page itself is fine; the data file next to it did not load.</div>'; }
+      else { render(); }
+      $('#storeinfo').textContent='data file unreachable';
+    }
+  }
+  load();
+  setInterval(load,5*60000);   // pick up a new push without a manual reload
+  setInterval(()=>{ if(ROWS) render(); },60000);  // keep the ages honest
+
+})();
+</script>
+</body>
+</html>
