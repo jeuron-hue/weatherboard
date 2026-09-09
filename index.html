@@ -12,10 +12,15 @@
   The claude.ai artifact at /code/artifact/4c1d04e1-5460-46bd-b8bf-484d150562ec is
   FROZEN as of 08/09/26 and is no longer updated; it stays only as a fallback view.
 
-  Data: a scheduled cloud-only run reads the artifact database, writes data.json
-  beside this file and pushes both through the GitHub Contents API. This page
-  fetches data.json; it has no live subscription and says so when the file is old.
+  Data: a cloud-only scheduled run mirrors new reading documents from the
+  artifact database into Supabase (project nyjsrnntxdgfykkmihpx, tables
+  readings and meta). This page reads those tables with the public key; it
+  has no live subscription and says so when the mirror is old.
 
+  09/09/26  Data source moved from data.json (pushed via a shell on Gary's
+            machine, which stopped mounting on 09/09) to a Supabase store that
+            a cloud-only run mirrors from the reading database. No machine in
+            the path. Freshness is meta.publish-heartbeat, written every run.
   08/09/26  Forked from the artifact source after the plain-language rewrite.
             Loader swapped from window.claude database to a data.json fetch,
             re-fetch every 5 min, plus two banners the artifact never needed:
@@ -257,7 +262,7 @@ footer .mono{color:var(--ink-2)}
   </div>
 
   <footer>
-    <span>Five readings a day: 0700 day-ahead, 1045 mid-morning, 1400 convection, 1745 evening, 2100 night, with a backup sweep behind each. Automated, unattended. Photos never inform a precipitation call. This page is a published copy, rewritten after each reading.</span>
+    <span>Five readings a day: 0700 day-ahead, 1045 mid-morning, 1400 convection, 1745 evening, 2100 night, with a backup sweep behind each. Automated, unattended. Photos never inform a precipitation call. This page reads a copy of the readings that is refreshed after each one.</span>
     <span class="mono" id="storeinfo"></span>
   </footer>
 </div>
@@ -501,11 +506,11 @@ footer .mono{color:var(--ink-2)}
     // banner, most severe first: missed run, then degraded, then a silent audit
     const nx=nextExpected(latest); const st=hbState(); const ga=genAge();
     if(FETCH_ERR){
-      banner.classList.add('show'); banner.innerHTML='<b>Not refreshing</b>The data file could not be loaded ('+esc(FETCH_ERR)+'). Everything below is whatever was last read and may be well out of date.';
+      banner.classList.add('show'); banner.innerHTML='<b>Not refreshing</b>The data store did not answer ('+esc(FETCH_ERR)+'). Everything below is whatever was last read and may be well out of date.';
     } else if(ga!=null && ga>FREEZE_H*3600000){
-      banner.classList.add('show'); banner.innerHTML='<b>Page frozen</b>The data file was last written '+fmtAge(ga)+' ago, longer than the '+FREEZE_H+' hr overnight gap between readings. The readings may still be running; what has stopped is the step that publishes them here.';
+      banner.classList.add('show'); banner.innerHTML='<b>Page frozen</b>The readings were last mirrored here '+fmtAge(ga)+' ago, longer than the '+FREEZE_H+' hr overnight gap between readings. The readings may still be running; what has stopped is the step that copies them here.';
     } else if(nx && Date.now()>nx.getTime()+45*60000){
-      banner.classList.add('show'); banner.innerHTML='<b>Run missed</b>The '+KINDS[nextOf(latest).k].lbl+' run expected at '+pad(new Date(nx.getTime()+(nx.getTimezoneOffset()+SGT)*60000).getHours())+pad(new Date(nx.getTime()+(nx.getTimezoneOffset()+SGT)*60000).getMinutes())+' hrs is not showing here. Either that reading did not run, or it ran and the step that publishes this page did not. Showing the last reading, '+fmtAge(age)+' old.';
+      banner.classList.add('show'); banner.innerHTML='<b>Run missed</b>The '+KINDS[nextOf(latest).k].lbl+' run expected at '+pad(new Date(nx.getTime()+(nx.getTimezoneOffset()+SGT)*60000).getHours())+pad(new Date(nx.getTime()+(nx.getTimezoneOffset()+SGT)*60000).getMinutes())+' hrs is not showing here. Either that reading did not run, or it ran and the step that copies it here did not. Showing the last reading, '+fmtAge(age)+' old.';
     } else if(cc==='degraded'||latest.degraded){
       banner.classList.add('show','warn'); banner.innerHTML='<b>Degraded</b>'+esc(latest.degraded_reason||'Latest run could not read radar; call rests on text products only.');
     } else if(st==='stale'||st==='absent'){
@@ -684,40 +689,51 @@ footer .mono{color:var(--ink-2)}
     render(); });
 
   // ---- data source -------------------------------------------------------
-  // GitHub Pages is static, so the readings arrive as a file that a scheduled
-  // run rewrites and pushes. There is no live subscription: the page re-fetches
-  // on a timer and says plainly how old the file is, because a push that stops
-  // working would otherwise leave a confident-looking page frozen in the past.
-  const DATA_URL='data.json';
-  // Longest normal gap between pushes is the 2100 to 0700 overnight stretch, 10 hrs.
-  // Anything past 11 means the publish step itself has stopped.
+  // The page reads straight from a small Supabase store that a cloud-only
+  // scheduled run mirrors from the reading database after each reading. There
+  // is no live subscription: the page re-fetches on a timer and says plainly
+  // how old the last mirror was, because a mirror that stops would otherwise
+  // leave a confident-looking page frozen in the past.
+  // The key below is Supabase's publishable key: public by design, read-only
+  // here because the tables grant the anonymous role nothing but select.
+  const SB_URL='https://nyjsrnntxdgfykkmihpx.supabase.co';
+  const SB_KEY='sb_publishable_q75DGiJBda-NwE3tdgPtFg_g3Rasmcg';
+  const SB_H={apikey:SB_KEY, Authorization:'Bearer '+SB_KEY};
+  // Longest normal gap between mirrors is the 2100 to 0700 overnight stretch, 10 hrs.
+  // Anything past 11 means the mirror step itself has stopped.
   const FREEZE_H=11;
-  let GEN=null;              // ISO timestamp the data file was generated
+  let GEN=null;              // ISO timestamp of the last mirror run, from meta.publish-heartbeat
   let FETCH_ERR=null;
 
   function genAge(){ if(!GEN) return null; const d=new Date(GEN); return isNaN(d)?null:Date.now()-d.getTime(); }
   function genWord(){ const a=genAge(); if(a==null) return 'age unknown';
-    return a<60000?'written just now':'written '+fmtAge(a)+' ago'; }
+    return a<60000?'mirrored just now':'mirrored '+fmtAge(a)+' ago'; }
 
   async function load(){
     try{
-      const r=await fetch(DATA_URL+'?v='+Date.now(),{cache:'no-store'});
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      const j=await r.json();
-      GEN=j.generated||null; HB=j.heartbeat||null; FETCH_ERR=null;
-      ROWS=Array.isArray(j.readings)?j.readings:[];
+      const [r,m]=await Promise.all([
+        fetch(SB_URL+'/rest/v1/readings?select=doc&order=ts.desc&limit=60',{headers:SB_H,cache:'no-store'}),
+        fetch(SB_URL+'/rest/v1/meta?select=id,doc',{headers:SB_H,cache:'no-store'})]);
+      if(!r.ok) throw new Error('readings HTTP '+r.status);
+      if(!m.ok) throw new Error('meta HTTP '+m.status);
+      const rows=await r.json(), meta=await m.json();
+      const byId={}; (Array.isArray(meta)?meta:[]).forEach(x=>{ byId[x.id]=x.doc; });
+      HB=byId['audit-heartbeat']||null;
+      GEN=(byId['publish-heartbeat']||{}).ts||null;
+      FETCH_ERR=null;
+      ROWS=(Array.isArray(rows)?rows:[]).map(x=>x.doc).filter(Boolean);
       render();
-      $('#storeinfo').textContent=ROWS.length+' readings · data '+genWord();
+      $('#storeinfo').textContent=ROWS.length+' readings · '+genWord();
     }catch(e){
       FETCH_ERR=e.message||String(e);
-      if(ROWS===null){ $('#app').innerHTML='<div class="empty">Could not load <code>data.json</code> ('+esc(FETCH_ERR)+
-        '). The page itself is fine; the data file next to it did not load.</div>'; }
+      if(ROWS===null){ $('#app').innerHTML='<div class="empty">Could not load the readings ('+esc(FETCH_ERR)+
+        '). The page itself is fine; the data store it reads from did not answer.</div>'; }
       else { render(); }
-      $('#storeinfo').textContent='data file unreachable';
+      $('#storeinfo').textContent='data store unreachable';
     }
   }
   load();
-  setInterval(load,5*60000);   // pick up a new push without a manual reload
+  setInterval(load,5*60000);   // pick up a new mirror without a manual reload
   setInterval(()=>{ if(ROWS) render(); },60000);  // keep the ages honest
 
 })();
