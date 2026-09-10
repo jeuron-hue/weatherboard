@@ -17,6 +17,15 @@
   readings and meta). This page reads those tables with the public key; it
   has no live subscription and says so when the mirror is old.
 
+  10/09/26  Wording pass after Gary read it live. Wind steadiness line was
+            ungrammatical on its third branch ("It is stations disagree..."),
+            now a whole sentence per branch. The run's wind note moved into the
+            fold, where every other raw figure already lives, because it was a
+            wall of thresholds in the plain layer. The heaviest-band line said
+            "in the heaviest patch on the map", restating its own label, and now
+            gives the band plus the ground it covers. The sparkline had no units
+            and no stated direction, so it now carries a plain caption with the
+            share of the map at each end.
   09/09/26  Data source moved from data.json (pushed via a shell on Gary's
             machine, which stopped mounting on 09/09) to a Supabase store that
             a cloud-only run mirrors from the reading database. No machine in
@@ -348,9 +357,9 @@ footer .mono{color:var(--ink-2)}
   function plainConf(cl){ return CONFPLAIN[cl]||'How sure this call is was not stated.'; }
 
   function plainSteady(R){ if(R==null) return null;
-    return R>=0.85?'blowing much the same way right across the island'
-         : R>=0.6 ?'broadly one direction, with some local variation'
-         :'stations disagree with each other, so the direction does not mean much'; }
+    return R>=0.85?'It is blowing much the same way right across the island.'
+         : R>=0.6 ?'It is broadly one direction, with some local variation.'
+         :'The stations disagree with each other, so the direction does not mean much.'; }
 
   function plainWind(w){
     if(w.mean_kmh==null&&w.dir_deg==null) return 'Wind was not read this run.';
@@ -531,7 +540,16 @@ footer .mono{color:var(--ink-2)}
 
     // radar spark
     const trend=Array.isArray(rd.trend_px)?rd.trend_px:[]; const mx=Math.max(1,...trend);
-    const spark=trend.length?'<div class="spark">'+trend.map(v=>'<div style="height:'+Math.max(6,Math.round(v/mx*100))+'%" title="'+v+' dots"></div>').join('')+'</div><div class="sparklbl"><span>'+esc(rd.trend_from||'')+' hrs</span><span>how much rain the radar saw, last half hour</span><span>'+esc(rd.frame||'')+' hrs</span></div>':'';
+    const MAPPX=217*120;   // 50 km product is 217 by 120 px
+    const pctMap=v=>{ const q=v/MAPPX*100; return q<0.1?q.toFixed(2):q.toFixed(1); };
+    let sparkLead='';
+    if(trend.length>1){
+      const a0=trend[0], b0=trend[trend.length-1];
+      sparkLead='<div class="lead q">'+(b0>a0*1.25?'Growing':b0<a0*0.75?'Shrinking':'Holding steady')
+        +': rain covered '+pctMap(a0)+' % of the radar map at '+esc(rd.trend_from||'the first frame')
+        +' hrs and '+pctMap(b0)+' % at '+esc(rd.frame||'the last frame')+' hrs.</div>';
+    }
+    const spark=trend.length?sparkLead+'<div class="spark">'+trend.map(v=>'<div style="height:'+Math.max(6,Math.round(v/mx*100))+'%" title="'+pctMap(v)+' % of the map"></div>').join('')+'</div><div class="sparklbl"><span>'+esc(rd.trend_from||'')+' hrs</span><span>share of the map with rain on it</span><span>'+esc(rd.frame||'')+' hrs</span></div>':'';
 
     // Peak band floor: a label resting on 1 or 2 dots is speckle, not weather.
     // 04/09/26, the board printed "extreme" off a single magenta pixel out of 65.
@@ -539,9 +557,15 @@ footer .mono{color:var(--ink-2)}
     const speckle = pk!=null && pk<=2;
     // The heaviest band is a property of whatever is on the map, not a headline.
     // Printed big under "almost nothing showing" it reads as a warning it is not.
+    // One pixel is 0.29 km square, so about 0.084 km2. Saying how much ground the
+    // heaviest band covers separates a single hard cell from a wall of rain.
+    const pkArea = pk!=null ? pk*0.0841 : null;
+    const pkAreaText = pkArea==null ? ''
+      : pkArea<0.5 ? ', over less than half a square kilometre'
+      : ', over about '+(pkArea<10?pkArea.toFixed(1):String(Math.round(pkArea)))+' km\u00B2';
     const peakPlain = pk==null ? 'not measured'
       : speckle ? 'nothing worth naming, just a stray spot or two'
-      : (plainBand(pl)||'unclassified')+' rain, in the heaviest patch on the map';
+      : (plainBand(pl)||'unclassified')+' rain'+pkAreaText;
 
     const neg=(val,okText,badText)=> val===true?'<div class="neg ok"><i>✓</i>'+okText+'</div>': val===false?'<div class="neg bad"><i>!</i>'+badText+'</div>':'<div class="neg na"><i>?</i>'+okText+' <small>(not read)</small></div>';
 
@@ -576,6 +600,7 @@ footer .mono{color:var(--ink-2)}
       + wrow('Direction', w.dir_deg!=null?compass(w.dir_deg)+dirName(w.dir_deg)+' <small>'+w.dir_deg+'°, the direction it blows from</small>':'–')
       + wrow('Coherence R', w.R!=null?w.R+' <small>vector mean over the 18 stations, 1.0 is perfect agreement</small>':'–')
       + '</div>'
+      + (w.note?'<p><b>What the run said about the gate.</b> '+esc(w.note)+'</p>':'')
       + '<p>The trigger line is the convergence gate: sea breezes from opposite coasts colliding inland is what fires most afternoon storms here, and a strong steady gradient wind stops that happening. Shut means the mechanism is unavailable, not that rain is impossible.</p>';
 
     const rainWork='<div class="kv">'
@@ -622,8 +647,7 @@ footer .mono{color:var(--ink-2)}
       <div class="tile">
         <div class="head"><span class="eyebrow">Wind</span>${ageSpan(w.stamp||w.age_min,t)}</div>
         <div class="lead">${esc(plainWind(w))}</div>
-        ${w.R!=null?'<div class="lead q">It is '+esc(plainSteady(w.R))+'.</div>':''}
-        ${w.note?'<div class="lead q">'+esc(w.note)+'</div>':''}
+        ${w.R!=null?'<div class="lead q">'+esc(plainSteady(w.R))+'</div>':''}
         ${gate}
         ${work(windWork)}
       </div>
