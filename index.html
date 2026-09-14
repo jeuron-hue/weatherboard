@@ -17,6 +17,8 @@
   readings and meta). This page reads those tables with the public key; it
   has no live subscription and says so when the mirror is old.
 
+  14/09/26  Refresh cut to once, on load. See the note at the foot of the
+            script for what was removed and what the reader gives up for it.
   10/09/26  Wording pass after Gary read it live. Wind steadiness line was
             ungrammatical on its third branch ("It is stations disagree..."),
             now a whole sentence per branch. The run's wind note moved into the
@@ -289,6 +291,9 @@ footer .mono{color:var(--ink-2)}
   try{ DETAIL=localStorage.getItem('esb-detail')==='1'; }catch(e){ DETAIL=false; }
 
   function sgtNow(){ const d=new Date(); return new Date(d.getTime()+(d.getTimezoneOffset()+SGT)*60000); }
+  // Nothing below load() advances on its own any more, so the page has to say
+  // when it was read. The header clock keeps running, so the gap is visible.
+  function loadStamp(){ const n=sgtNow(); return pad(n.getHours())+pad(n.getMinutes()); }
   function tickClock(){ const n=sgtNow(); $('#clock').textContent=pad(n.getHours())+pad(n.getMinutes());
     $('#date').textContent=pad(n.getDate())+'/'+pad(n.getMonth()+1)+'/'+String(n.getFullYear()).slice(2); }
   tickClock(); setInterval(tickClock,15000);
@@ -747,18 +752,26 @@ footer .mono{color:var(--ink-2)}
       FETCH_ERR=null;
       ROWS=(Array.isArray(rows)?rows:[]).map(x=>x.doc).filter(Boolean);
       render();
-      $('#storeinfo').textContent=ROWS.length+' readings · '+genWord();
+      $('#storeinfo').textContent=ROWS.length+' readings · '+genWord()+' · page read at '+loadStamp()+' hrs, reload for newer';
     }catch(e){
       FETCH_ERR=e.message||String(e);
       if(ROWS===null){ $('#app').innerHTML='<div class="empty">Could not load the readings ('+esc(FETCH_ERR)+
         '). The page itself is fine; the data store it reads from did not answer.</div>'; }
       else { render(); }
-      $('#storeinfo').textContent='data store unreachable';
+      $('#storeinfo').textContent='data store unreachable · page read at '+loadStamp()+' hrs';
     }
   }
+  // 14/09/26  Refresh is once, on load. Two timers used to sit here: a 5 min
+  //           re-fetch and a 60 s re-render. The re-render rebuilt app.innerHTML
+  //           wholesale, which shut every open "show the working" fold under the
+  //           reader mid-sentence, and the page repainted sixty times an hour to
+  //           serve data that changes five times a day.
+  //           Accepted consequence: every age, banner and countdown below is
+  //           computed once, at load, and does not move afterwards. A page left
+  //           open all night will still say what it said at midnight. The footer
+  //           carries the load time and the header clock keeps running, so the
+  //           two together show how stale the page has gone.
   load();
-  setInterval(load,5*60000);   // pick up a new mirror without a manual reload
-  setInterval(()=>{ if(ROWS) render(); },60000);  // keep the ages honest
 
 })();
 </script>
