@@ -626,15 +626,23 @@ footer .mono{color:var(--ink-2)}
       banner.classList.add('show','warn'); banner.innerHTML='<b>Self-check failing</b>'+esc(HB.note||'The last daily self-check did not pass. Check the run history.');
     }
 
-    // track record
-    const hasScore=r=>r.score&&r.score.of&&!/^(none|n\/a|-)$/i.test(String(r.score.of)); const scored=rows.filter(hasScore); const tally={hit:0,miss:0,partial:0,scope:0,unscored:0};
-    scored.forEach(r=>tally[verdictClass(r.score.verdict)]++);
+    // Track record, reworked 14/09/26. It used to count score.verdict, which is
+    // the INTERIM read a run takes on its predecessor before that predecessor's
+    // window has finished, so it is almost always SCOPE and says nothing about
+    // whether a call was right. close.verdict is the real record: taken by the
+    // run two slots later, after the whole window has elapsed, and it is only
+    // ever HIT or MISS. Readings before 14/09/26 2116 hrs have no close, so the
+    // closed count starts small and fills in over days.
+    const hasClose=r=>r.close&&r.close.of&&!/^(none|n\/a|-)$/i.test(String(r.close.of));
+    const closed=rows.filter(hasClose); const tally={hit:0,miss:0,partial:0,scope:0,unscored:0};
+    closed.forEach(r=>tally[verdictClass(r.close.verdict)]++);
+    const hasScore=r=>r.score&&r.score.of&&!/^(none|n\/a|-)$/i.test(String(r.score.of)); const scored=rows.filter(hasScore);
     const stripRows=rows.slice(0,28).reverse();
-    const strip=stripRows.map(r=>{ const v=hasScore(r)?verdictClass(r.score.verdict):'none';
+    const strip=stripRows.map(r=>{ const v=hasClose(r)?verdictClass(r.close.verdict):'none';
       const ch={hit:'✓',miss:'✕',partial:'~',scope:'~',unscored:'?',none:'·'}[v];
-      const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasScore(r)?' scored '+r.score.of+': '+(r.score.verdict||'')+(r.score.mechanism?' ('+r.score.mechanism+')':''):' (scores nothing)');
+      const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasClose(r)?' closed '+r.close.of+': '+(r.close.verdict||'')+(r.close.note?' ('+r.close.note+')':''):' (closed nothing)');
       return '<div class="sq '+(v==='none'?'':(v==='scope'?'partial':v))+(r.kind==='day-ahead'?' day':'')+'" title="'+esc(title)+'">'+ch+'</div>'; }).join('');
-    const lastScore=scored[0];
+    const lastScore=scored[0]; const lastClose=closed[0];
 
     // radar spark
     const trend=Array.isArray(rd.trend_px)?rd.trend_px:[]; const mx=Math.max(1,...trend);
@@ -668,7 +676,12 @@ footer .mono{color:var(--ink-2)}
     const neg=(val,okText,badText)=> val===true?'<div class="neg ok"><i>✓</i>'+okText+'</div>': val===false?'<div class="neg bad"><i>!</i>'+badText+'</div>':'<div class="neg na"><i>?</i>'+okText+' <small>(not read)</small></div>';
 
     const nightish=(latest.kind==='evening'||latest.kind==='night');
-    const gate = (latest.kind!=='day-ahead') ? '<div class="gate" style="color:var(--'+(o.gate==='open'?'crit':o.gate==='shut'?'good':'dim')+')">'+(nightish?'Overnight rain trigger: ':'Sea-breeze rain trigger: ')+esc(o.gate==='open'?(nightish?'possible tonight':'possible today'):o.gate==='shut'?(nightish?'ruled out tonight':'ruled out today'):(o.gate||'not stated'))+'</div>' : '';
+    // 14/09/26: the 1755 run wrote `gate` at the top level where the prompt's
+    // template puts it inside obs, and the panel rendered "not stated". The
+    // model file now forbids the move, but documents already written that way
+    // are in the store for 120 days, so read both places.
+    const gateVal = (o.gate!=null? o.gate : latest.gate);
+    const gate = (latest.kind!=='day-ahead') ? '<div class="gate" style="color:var(--'+(gateVal==='open'?'crit':gateVal==='shut'?'good':'dim')+')">'+(nightish?'Overnight rain trigger: ':'Sea-breeze rain trigger: ')+esc(gateVal==='open'?(nightish?'possible tonight':'possible today'):gateVal==='shut'?(nightish?'ruled out tonight':'ruled out today'):(gateVal||'not stated'))+'</div>' : '';
 
     // Run log: today expanded, everything older collapsed behind a summary that
     // carries the verdict counts, so it only needs opening when something looks off.
@@ -846,16 +859,16 @@ footer .mono{color:var(--ink-2)}
     <section class="hist">
       <h2>Track record</h2>
       <div class="tile">
-        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${scored.length} scored of ${rows.length} runs</span></div>
+        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${closed.length} closed of ${rows.length} runs</span></div>
         <div class="bigrow">
           <div><span class="big" style="color:var(--good)">${tally.hit}</span><span class="lbl">right</span></div>
-          <div><span class="big" style="color:var(--warn)">${tally.partial+tally.scope}</span><span class="lbl">part of the window</span></div>
           <div><span class="big" style="color:var(--crit)">${tally.miss}</span><span class="lbl">wrong</span></div>
           ${tally.unscored?'<div><span class="big" style="color:var(--dim)">'+tally.unscored+'</span><span class="lbl">could not be marked</span></div>':''}
         </div>
         <div class="strip">${strip}</div>
-        <div class="legend"><span><b>✓</b> right</span><span><b>~</b> part of the window</span><span><b>✕</b> wrong</span><span><b>·</b> nothing to mark</span><span>underline = 0700 run</span></div>
-        ${lastScore?'<div class="scorenote"><b>Last marked:</b> '+esc(lastScore.score.of)+' → '+esc(lastScore.score.verdict||'')+(lastScore.score.mechanism_note||lastScore.score.mechanism?'. '+esc(lastScore.score.mechanism_note||lastScore.score.mechanism):'')+'</div>':'<div class="scorenote">No run has marked a predecessor yet.</div>'}
+        <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>·</b> not closed yet</span><span>underline = 0700 run</span></div>
+        ${lastClose?'<div class="scorenote"><b>Last closed:</b> '+esc(lastClose.close.of)+' → '+esc(lastClose.close.verdict||'')+(lastClose.close.note?'. '+esc(lastClose.close.note):'')+'</div>':'<div class="scorenote">No call has been closed yet. A call is only marked right or wrong once its whole window has passed, which happens about six hours after it was made.</div>'}
+        <div class="foot">A call is judged only after the window it covered has finished, so tonight's readings stay unmarked until tomorrow. Interim checks taken while a window is still running are in the run log, not counted here.</div>
       </div>
     </section>
 
