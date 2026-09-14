@@ -17,6 +17,23 @@
   readings and meta). This page reads those tables with the public key; it
   has no live subscription and says so when the mirror is old.
 
+  14/09/26  ANSWERS FIRST. Improvement item 2. The page used to open with the
+            lean sentence and then three instrument tiles, so a reader met the
+            wind, the gauges and the radar before learning whether they needed
+            an umbrella. Gary: knowing there is echo does not help the
+            audience's plans, and if the reading is a rehash of the instrument
+            data the audience can read that at NEA directly.
+            It now opens with the consequence line, largest thing on the page,
+            then the three committed answers for Bedok, Tampines and Changi,
+            then the reasoning and the residual risk. Every instrument panel
+            moved inside ONE collapsed "show the working" section.
+            Fields come from claude/forecasting-model.md section 7, first
+            written by 2026-09-14-1755-evening. Documents older than that carry
+            none of them, so the hero falls back to the old lean-led layout
+            whenever answers is absent, and 47 of the 55 rows in the store on
+            the day this shipped are in exactly that state.
+            Item 3 rides with it: a slot that never filed now shows in the run
+            log as its own row rather than being invisible.
   14/09/26  Refresh cut to once, on load. See the note at the foot of the
             script for what was removed and what the reader gives up for it.
   10/09/26  Wording pass after Gary read it live. Wind steadiness line was
@@ -125,6 +142,46 @@ header h1 span{color:var(--muted);font-weight:500}
 .next{margin-top:8px;font-size:13px;color:var(--muted)}
 .next b{color:var(--ink-2);font-weight:500}
 
+/* ANSWERS FIRST, 14/09/26. The consequence line is the largest thing on the
+   page by design: it is the one sentence that says what to actually do. The
+   three town answers sit under it, the reasoning under those. Everything with
+   a number in it is below the fold. */
+.conseq{font-family:var(--fd);font-weight:600;font-size:clamp(24px,3.2vw,40px);line-height:1.14;
+  text-wrap:balance;margin:2px 0 0;letter-spacing:-.005em}
+@media (max-width:720px){.conseq{font-size:24px}}
+.horizon{margin-top:8px;font-size:13px;color:var(--muted);font-family:var(--fm)}
+.towns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+@media (max-width:720px){.towns{grid-template-columns:1fr;gap:6px}}
+.town{background:var(--surface-2);border:1px solid var(--line-2);border-radius:7px;padding:10px 12px;min-width:0}
+.town .nm{font-family:var(--fd);font-weight:700;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.town .st{font-family:var(--fd);font-weight:600;font-size:19px;line-height:1.2;margin-top:3px}
+.town .sub{font-size:13px;color:var(--ink-2);margin-top:3px}
+.town.dry .st{color:var(--good)}
+.town.wet .st{color:var(--crit)}
+.town.due .st{color:var(--warn)}
+.town.unk .st{color:var(--dim)}
+.because{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line);font-size:15px;color:var(--ink)}
+.because b{font-family:var(--fd);font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:11px;
+  color:var(--muted);display:block;margin-bottom:3px}
+.risk{margin-top:11px;font-size:14px;color:var(--ink-2);padding-left:11px;border-left:3px solid var(--warn)}
+.risk b{font-family:var(--fd);font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:11px;
+  color:var(--warn);display:block;margin-bottom:2px}
+.legacy{margin-top:12px;font-size:13px;color:var(--muted);padding-top:10px;border-top:1px dashed var(--line)}
+
+/* the single big fold that now holds every instrument panel */
+details.instruments{margin-top:14px}
+details.instruments>summary{cursor:pointer;list-style:none;font-family:var(--fd);font-weight:600;font-size:12px;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);display:inline-flex;align-items:center;gap:8px;
+  padding:9px 15px;border-radius:999px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow)}
+details.instruments>summary::-webkit-details-marker{display:none}
+details.instruments>summary::before{content:"";width:0;height:0;border-left:6px solid currentColor;
+  border-top:4px solid transparent;border-bottom:4px solid transparent;flex:none;transition:transform .15s}
+details.instruments[open]>summary::before{transform:rotate(90deg)}
+details.instruments>summary:hover{border-color:var(--accent);color:var(--ink)}
+details.instruments>summary .hint{font-family:var(--fb);font-weight:400;text-transform:none;letter-spacing:0;
+  font-size:12px;color:var(--muted)}
+@media (max-width:720px){details.instruments>summary .hint{display:none}}
+
 /* "show the working" folds: every technical string and raw number lives in one */
 details.work{margin-top:11px;padding-top:9px;border-top:1px dashed var(--line)}
 details.work>summary{cursor:pointer;list-style:none;font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.09em;
@@ -230,6 +287,8 @@ table{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 th{font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
 td{padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:top}
 tr:last-child td{border-bottom:0}
+tr.missed td{background:var(--crit-bg)}
+tr.missed td.lean-cell{color:var(--crit)}
 td.when{font-family:var(--fm);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-2)}
 td.lean-cell{max-width:46ch}
 td.lean-cell details summary{cursor:pointer;list-style:none;color:var(--ink);padding:2px 0}
@@ -308,7 +367,7 @@ footer .mono{color:var(--ink-2)}
     if(c.startsWith('high')) return 'high'; if(c.includes('mod')&&c.includes('high')) return 'mod-high';
     if(c.startsWith('mod')) return 'moderate'; if(c.includes('degrad')) return 'degraded'; if(c.startsWith('low')) return 'low'; return 'unknown'; }
   function chipFor(cl){ return {high:'good','mod-high':'good',moderate:'warn',low:'crit',degraded:'crit',unknown:''}[cl]||''; }
-  function verdictClass(v){ v=String(v||'').toLowerCase(); if(v.startsWith('hit')||v.startsWith('verif')) return 'hit'; if(v.startsWith('miss')||v.startsWith('fail')) return 'miss'; if(v.startsWith('part')) return 'partial'; return 'unscored'; }
+  function verdictClass(v){ v=String(v||'').toLowerCase(); if(v.startsWith('hit')||v.startsWith('verif')) return 'hit'; if(v.startsWith('miss')||v.startsWith('fail')) return 'miss'; if(v.startsWith('part')) return 'partial'; if(v.startsWith('scope')) return 'scope'; return 'unscored'; }
   function compass(deg){ if(deg==null) return '';
     return '<svg class="compass" viewBox="0 0 16 16" aria-hidden="true"><g transform="rotate('+(deg)+' 8 8)"><path d="M8 1.5 L11 9 L8 7.5 L5 9 Z" fill="currentColor"/><path d="M8 7.5 L11 9 L8 14.5 L5 9 Z" fill="currentColor" opacity=".35"/></g></svg>'; }
   function dirName(d){ if(d==null) return ''; const n=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']; return n[Math.round(d/22.5)%16]; }
@@ -327,6 +386,10 @@ footer .mono{color:var(--ink-2)}
               'convection':{k:'evening',h:17,m:50,at:'1745'},'evening':{k:'night',h:21,m:5,at:'2101'},
               'night':{k:'day-ahead',h:7,m:15,at:'0711',nextDay:true}};
   function nextOf(r){ return NEXT[r.kind]||NEXT['day-ahead']; }
+  // Item 3, 14/09/26: the five slots a day, in order, so a slot that never filed
+  // can be named rather than simply missing from the log.
+  const SLOTS=[{k:'day-ahead',at:'0700'},{k:'mid-morning',at:'1045'},{k:'convection',at:'1400'},
+               {k:'evening',at:'1745'},{k:'night',at:'2100'}];
 
   // Expected next run after a reading, SGT wall clock
   function nextExpected(r){ const t=runTs(r); if(!t) return null;
@@ -409,6 +472,35 @@ footer .mono{color:var(--ink-2)}
   function plainNear(km,brg,lab){
     if(km==null) return 'nothing on the map';
     return km+' km to the '+dirLong(brg)+(lab?', '+plainBand(lab)+' rain':''); }
+
+  // ---- the three answers, 14/09/26 -----------------------------------------
+  // claude/forecasting-model.md section 7. First written by
+  // 2026-09-14-1755-evening; every document before that has no answers block at
+  // all, so everything here must tolerate its absence and the hero falls back.
+  function hasAnswers(r){ const a=r&&r.answers;
+    return !!(a && (a.raining_now!=null || a.consequence || a.horizon)); }
+  function hhmm(iso){ if(!iso) return null; const d=new Date(iso); if(isNaN(d)) return null;
+    const w=new Date(d.getTime()+(d.getTimezoneOffset()+SGT)*60000);
+    return pad(w.getHours())+pad(w.getMinutes()); }
+  function isWet(a,town){ if(!a) return null; if(a.raining_now==null) return null;
+    if(a.raining_now!==true) return false;
+    const list=Array.isArray(a.raining_in)?a.raining_in.map(x=>String(x).toLowerCase()):[];
+    return list.length?list.includes(town.toLowerCase()):true; }
+  // One town, one committed line. Reads only from answers.*, never from obs.
+  function townCard(a,town){
+    const wet=isWet(a,town);
+    const onset=hhmm(a&&a.onset), stop=hhmm(a&&a.stop), restart=hhmm(a&&a.restart);
+    let cls='unk', st='Not stated', sub='';
+    if(wet===true){
+      cls='wet'; st='Raining now';
+      sub = stop ? ('Easing about '+stop+' hrs'+(restart?', back again around '+restart+' hrs':'')) : 'No clearing time given';
+    } else if(wet===false){
+      if(onset){ cls='due'; st='Rain about '+onset+' hrs'; sub='Dry until then'; }
+      else { cls='dry'; st='Dry'; sub='No rain expected'+(a&&a.horizon?' before '+hhmm(a.horizon)+' hrs':''); }
+    }
+    return '<div class="town '+cls+'"><div class="nm">'+esc(town)+'</div><div class="st">'+esc(st)+'</div>'
+         + (sub?'<div class="sub">'+esc(sub)+'</div>':'')+'</div>'; }
+  function townsBlock(a){ return '<div class="towns">'+['Bedok','Tampines','Changi'].map(t=>townCard(a,t)).join('')+'</div>'; }
 
   // Haze. NEA 1-hr PM2.5 bands, read off haze.gov.sg 04/09/26:
   // 0 to 55 Normal, 56 to 150 Elevated, 151 to 250 High, 251 and above Very High.
@@ -516,6 +608,7 @@ footer .mono{color:var(--ink-2)}
     const latest=rows[0]; const t=runTs(latest); const age=t?Date.now()-t.getTime():null;
     const o=latest.obs||{}; const w=o.wind||{}, rn=o.rain||{}, rd=o.radar||{}, lt=o.lightning||{}, nc=o.nowcast||{};
     const cc=confClass(latest.conf_level||latest.confidence);
+    const A=latest.answers||null;
 
     // banner, most severe first: missed run, then degraded, then a silent audit
     const nx=nextExpected(latest); const st=hbState(); const ga=genAge();
@@ -534,13 +627,13 @@ footer .mono{color:var(--ink-2)}
     }
 
     // track record
-    const hasScore=r=>r.score&&r.score.of&&!/^(none|n\/a|-)$/i.test(String(r.score.of)); const scored=rows.filter(hasScore); const tally={hit:0,miss:0,partial:0,unscored:0};
+    const hasScore=r=>r.score&&r.score.of&&!/^(none|n\/a|-)$/i.test(String(r.score.of)); const scored=rows.filter(hasScore); const tally={hit:0,miss:0,partial:0,scope:0,unscored:0};
     scored.forEach(r=>tally[verdictClass(r.score.verdict)]++);
     const stripRows=rows.slice(0,28).reverse();
     const strip=stripRows.map(r=>{ const v=hasScore(r)?verdictClass(r.score.verdict):'none';
-      const ch={hit:'✓',miss:'✕',partial:'~',unscored:'?',none:'·'}[v];
+      const ch={hit:'✓',miss:'✕',partial:'~',scope:'~',unscored:'?',none:'·'}[v];
       const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasScore(r)?' scored '+r.score.of+': '+(r.score.verdict||'')+(r.score.mechanism?' ('+r.score.mechanism+')':''):' (scores nothing)');
-      return '<div class="sq '+(v==='none'?'':v)+(r.kind==='day-ahead'?' day':'')+'" title="'+esc(title)+'">'+ch+'</div>'; }).join('');
+      return '<div class="sq '+(v==='none'?'':(v==='scope'?'partial':v))+(r.kind==='day-ahead'?' day':'')+'" title="'+esc(title)+'">'+ch+'</div>'; }).join('');
     const lastScore=scored[0];
 
     // radar spark
@@ -582,21 +675,45 @@ footer .mono{color:var(--ink-2)}
     const today=todayStr();
     const todayRows=rows.filter(r=>r.date===today);
     const earlierRows=rows.filter(r=>r.date!==today).slice(0,60);
-    const et={hit:0,miss:0,partial:0,unscored:0,none:0,rec:0};
+    const et={hit:0,miss:0,partial:0,scope:0,unscored:0,none:0,rec:0};
     earlierRows.forEach(r=>{ et[hasScore(r)?verdictClass(r.score.verdict):'none']++; if(r.recovery) et.rec++; });
-    const earlierTally=[et.hit?et.hit+' hit':'', et.partial?et.partial+' partial':'', et.miss?et.miss+' miss':'',
+    const earlierTally=[et.hit?et.hit+' hit':'', (et.partial+et.scope)?(et.partial+et.scope)+' part':'', et.miss?et.miss+' miss':'',
                         et.rec?et.rec+' recovery':''].filter(Boolean).join(' · ')||'nothing scored';
-    function logRow(r){ const c=confClass(r.conf_level||r.confidence); const v=hasScore(r)?verdictClass(r.score.verdict):null;
-      return '<tr><td class="when">'+dmy(r.date)+' '+esc(r.time)+'</td><td class="kindc"><span class="chip kind">'+shortKind(r)+'</span>'+(r.recovery?' <span class="chip warn">rec</span>':'')+'</td><td class="confc"><span class="chip '+chipFor(c)+'">'+esc(r.conf_level||c)+'</span></td><td class="lean-cell"><details'+(DETAIL?' open':'')+'><summary>'+esc(r.lean||'')+'</summary><div>'+esc((r.confidence?'Confidence: '+r.confidence+'\n':'')+(Array.isArray(r.unresolved)?r.unresolved.map(u=>'• '+u).join('\n'):'')+(r.route?'\nRoute '+r.route:''))+'</div></details></td><td class="scorec">'+(v?'<span class="chip '+({hit:'good',miss:'crit',partial:'warn',unscored:''}[v])+'">'+esc(r.score.verdict)+'</span>'+(r.score.mechanism?'<div style="font-size:12px;color:var(--muted);margin-top:3px">'+esc(r.score.mechanism)+'</div>':''):'<span class="age">not scored</span>')+'</td></tr>'; }
+
+    // Item 3, 14/09/26: a slot that never filed used to be simply absent, so the
+    // only trace of the 09/09 1400 gap was a banner that had long since moved on.
+    // Today's log now carries a row for every slot whose time has passed, and an
+    // empty one says so in red instead of saying nothing at all.
+    function missedToday(){ const n=sgtNow(); const out=[];
+      SLOTS.forEach(s=>{ const h=+s.at.slice(0,2), m=+s.at.slice(2);
+        const due=new Date(n); due.setHours(h,m,0,0);
+        if(n.getTime() < due.getTime()+45*60000) return;          // not yet overdue
+        if(todayRows.some(r=>r.kind===s.k)) return;               // it filed
+        out.push({missed:true,kind:s.k,at:s.at,date:today}); });
+      return out; }
+
+    function logRow(r){
+      if(r.missed) return '<tr class="missed"><td class="when">'+dmy(r.date)+' '+esc(r.at)+'</td>'
+        + '<td class="kindc"><span class="chip kind">'+esc(r.at)+'</span></td>'
+        + '<td class="confc"><span class="chip crit">missed</span></td>'
+        + '<td class="lean-cell">No reading filed for this slot. Either the run did not fire, or it fired and the step that copies it here did not.</td>'
+        + '<td class="scorec"></td></tr>';
+      const c=confClass(r.conf_level||r.confidence); const v=hasScore(r)?verdictClass(r.score.verdict):null;
+      return '<tr><td class="when">'+dmy(r.date)+' '+esc(r.time)+'</td><td class="kindc"><span class="chip kind">'+shortKind(r)+'</span>'+(r.recovery?' <span class="chip warn">rec</span>':'')+'</td><td class="confc"><span class="chip '+chipFor(c)+'">'+esc(r.conf_level||c)+'</span></td><td class="lean-cell"><details'+(DETAIL?' open':'')+'><summary>'+esc((r.answers&&r.answers.consequence)||r.lean||'')+'</summary><div>'+esc((r.lean&&r.answers&&r.answers.consequence?r.lean+'\n':'')+(r.confidence?'Confidence: '+r.confidence+'\n':'')+(Array.isArray(r.unresolved)?r.unresolved.map(u=>'• '+u).join('\n'):'')+(r.route?'\nRoute '+r.route:''))+'</div></details></td><td class="scorec">'+(v?'<span class="chip '+({hit:'good',miss:'crit',partial:'warn',scope:'warn',unscored:''}[v])+'">'+esc(r.score.verdict)+'</span>'+(r.score.mechanism?'<div style="font-size:12px;color:var(--muted);margin-top:3px">'+esc(r.score.mechanism)+'</div>':''):'<span class="age">not scored</span>')+'</td></tr>'; }
     function logTable(rs){ if(!rs.length) return '<div class="empty">No runs filed yet today. The first is the 0700 hrs day-ahead.</div>';
       return '<div class="tablewrap"><table><thead><tr><th>Run</th><th>Kind</th><th>How sure</th><th>The call</th><th>Marking the run before</th></tr></thead><tbody>'+rs.map(logRow).join('')+'</tbody></table></div>'; }
+    const todayAll=todayRows.concat(missedToday()).sort((a,b)=>String(b.time||b.at).localeCompare(String(a.time||a.at)));
 
     // ---- folds: every technical string and raw figure, verbatim -------------
     const leanWork=
         (latest.confidence?'<p><b>Confidence.</b> '+esc(latest.confidence)+'</p>':'')
+      + (A&&A.horizon?'<p><b>Horizon.</b> The call above covers to '+esc(hhmm(A.horizon)||A.horizon)+' hrs.</p>':'')
+      + (latest.mechanism&&latest.mechanism.expected?'<p><b>Mechanism expected.</b> <span class="mono">'+esc(latest.mechanism.expected)+'</span>'+(Array.isArray(latest.mechanism.considered)&&latest.mechanism.considered.length?'. Considered: <span class="mono">'+esc(latest.mechanism.considered.join(', '))+'</span>':'')+'</p>':'')
       + (Array.isArray(latest.unresolved)&&latest.unresolved.length?'<p><b>Unresolved.</b></p><ul>'+latest.unresolved.map(u=>'<li>'+esc(u)+'</li>').join('')+'</ul>':'')
       + (latest.next_data?'<p><b>What would settle it.</b> '+esc(latest.next_data)+'</p>':'')
-      + (latest.score&&latest.score.of?'<p><b>Marking the previous run.</b> '+esc(latest.score.of)+' → '+esc(latest.score.verdict||'')+(latest.score.mechanism?'. '+esc(latest.score.mechanism):'')+'</p>':'')
+      + (latest.score&&latest.score.of?'<p><b>Marking the previous run.</b> '+esc(latest.score.of)+' → '+esc(latest.score.verdict||'')+(latest.score.scope?' ('+esc(latest.score.scope)+')':'')+(latest.score.mechanism_note||latest.score.mechanism?'. '+esc(latest.score.mechanism_note||latest.score.mechanism):'')+'</p>':'')
+      + (latest.score&&latest.score.acted_outcome?'<p><b>What a reader acting on it got.</b> '+esc(latest.score.acted_outcome)+'</p>':'')
+      + (latest.route?'<p><b>Browser route.</b> '+esc(latest.route)+'</p>':'')
       + (latest.filed?'<p><b>Full reading.</b> <span class="mono">'+esc(latest.filed)+'</span></p>':'');
 
     const windWork='<div class="kv">'
@@ -624,13 +741,17 @@ footer .mono{color:var(--ink-2)}
       + wrow('Nearest Tampines', rd.tampines_km!=null?rd.tampines_km+' km, bearing '+rd.tampines_brg+'°'+(rd.tampines_label?' <small>'+esc(rd.tampines_label)+'</small>':''):'none')
       + wrow('Frame', rd.frame?esc(rd.frame)+' hrs'+(rd.trend_from?' <small>trend from '+esc(rd.trend_from)+' hrs</small>':''):'–')
       + wrow('Trend, px per frame', trend.length?trend.join(' → '):'–')
+      + (latest.onset_observed&&latest.onset_observed.first_echo?wrow('First echo overhead',['bedok','tampines','changi'].map(k=>k+' '+(hhmm(latest.onset_observed.first_echo[k])||'none')).join(', ')):'')
       + '</div>'
       + '<p>50 km product, 217 by 120 px covering about 63 by 35 km, one pixel about 0.29 km. Bands run cyan, green, yellow, orange, red, magenta. A peak band resting on one or two pixels is speckle and is not named. Radar sees rain aloft, which does not always reach the ground.</p>';
 
-    app.innerHTML=`
-    <div class="lean" data-conf="${cc}">
-      <div class="stripe"></div>
-      <div class="body">
+    // ---- the hero -----------------------------------------------------------
+    // Answers first. The consequence line is the headline because it is the only
+    // sentence that says what to do; the three towns carry the commitment; the
+    // lean is demoted to the reasoning underneath. A document written before
+    // 14/09/26 has no answers block, so it falls back to the old lean-led hero
+    // and says why rather than rendering three empty boxes.
+    const chips=`
         <div class="top">
           <span class="chip kind">${esc(label(latest))}</span>
           ${latest.recovery?'<span class="chip warn">backup run</span>':''}
@@ -639,57 +760,86 @@ footer .mono{color:var(--ink-2)}
           <span class="age ${age!=null?ageClass(age,9,18):''}">${age!=null?fmtAge(age)+' ago':''}</span>
           <span class="chip ${chipFor(cc)}"><span class="dot"></span>${esc(latest.conf_level||cc)}</span>
           ${latest.route?'<span class="age routechip">route '+esc(latest.route)+'</span>':''}
-        </div>
+        </div>`;
+
+    const hero = hasAnswers(latest) ? `
+    <div class="lean" data-conf="${cc}">
+      <div class="stripe"></div>
+      <div class="body">
+        ${chips}
+        <p class="conseq">${esc(A.consequence||latest.lean||'No call recorded.')}</p>
+        ${A.horizon?'<div class="horizon">This call covers to '+esc(hhmm(A.horizon)||A.horizon)+' hrs</div>':''}
+        ${townsBlock(A)}
+        ${latest.lean?'<div class="because"><b>Why</b>'+esc(latest.lean)+'</div>':''}
+        ${A.residual_risk?'<div class="risk"><b>What could change it</b>'+esc(A.residual_risk)+'</div>':''}
+        <div class="sure"><b>How sure.</b> ${esc(plainConf(cc))}</div>
+        ${latest.outlook?'<div class="conf">'+esc(latest.outlook)+'</div>':''}
+        ${work(leanWork)}
+        <div class="next"><b>Next reading:</b> ${nextRunText(latest)}</div>
+      </div>
+    </div>` : `
+    <div class="lean" data-conf="${cc}">
+      <div class="stripe"></div>
+      <div class="body">
+        ${chips}
         <p class="call">${esc(latest.lean||'No lean recorded.')}</p>
         ${latest.outlook?'<div class="conf">'+esc(latest.outlook)+'</div>':''}
         <div class="sure"><b>How sure.</b> ${esc(plainConf(cc))}</div>
         ${work(leanWork)}
+        <div class="legacy">This reading was filed before the board started recording a committed answer for each town, so there is one call here rather than three and no consequence line. Readings from 14/09/26 1755 hrs onwards carry both.</div>
         <div class="next"><b>Next reading:</b> ${nextRunText(latest)}</div>
       </div>
-    </div>
+    </div>`;
 
-    <div class="grid three">
-      <div class="tile">
-        <div class="head"><span class="eyebrow">Wind</span>${ageSpan(w.stamp||w.age_min,t)}</div>
-        <div class="lead">${esc(plainWind(w))}</div>
-        ${w.R!=null?'<div class="lead q">'+esc(plainSteady(w.R))+'</div>':''}
-        ${gate}
-        ${work(windWork)}
+    app.innerHTML=`
+    ${hero}
+
+    <details class="instruments"${DETAIL?' open':''}>
+      <summary>Show the working <span class="hint">wind, gauges, radar and air quality behind the call</span></summary>
+
+      <div class="grid three">
+        <div class="tile">
+          <div class="head"><span class="eyebrow">Wind</span>${ageSpan(w.stamp||w.age_min,t)}</div>
+          <div class="lead">${esc(plainWind(w))}</div>
+          ${w.R!=null?'<div class="lead q">'+esc(plainSteady(w.R))+'</div>':''}
+          ${gate}
+          ${work(windWork)}
+        </div>
+
+        <div class="tile">
+          <div class="head"><span class="eyebrow">Rain and lightning</span>${ageSpan(rn.stamp||rn.age_min,t)}</div>
+          <div class="lead">${esc(plainRain(rn))}</div>
+          ${plainNowcast(nc)?'<div class="lead q">'+esc(plainNowcast(nc))+'</div>':''}
+          <div class="negs">
+            ${neg(lt.none_detected,'No lightning anywhere','Lightning detected')}
+            ${neg(lt.no_thundery,'No thundery showers forecast','Thundery showers forecast')}
+          </div>
+          ${work(rainWork)}
+        </div>
+
+        <div class="tile">
+          <div class="head"><span class="eyebrow">What the radar sees</span><span class="age">${ageText(rd.stamp||rd.age_min,t)}</span></div>
+          <div class="bigrow">
+            <div><span class="big word">${esc(plainCover(rd.echo_pct))}</span><span class="lbl">showing on the radar around here right now</span></div>
+          </div>
+          <div class="kv">
+            <span class="k">Heaviest of it</span><span class="v words">${esc(peakPlain)}</span>
+            <span class="k">Nearest to Bedok</span><span class="v words">${esc(plainNear(rd.bedok_km,rd.bedok_brg,rd.bedok_label))}</span>
+            <span class="k">Nearest to Tampines</span><span class="v words">${esc(plainNear(rd.tampines_km,rd.tampines_brg,rd.tampines_label))}</span>
+            <span class="k">Heading our way?</span><span class="v words">${esc(rd.motion||'not assessed')}</span>
+            ${rd.upstream?'<span class="k">Anything further out?</span><span class="v words">'+esc(rd.upstream)+'</span>':''}
+          </div>
+          ${spark}
+          ${work(radarWork)}
+        </div>
       </div>
 
-      <div class="tile">
-        <div class="head"><span class="eyebrow">Rain and lightning</span>${ageSpan(rn.stamp||rn.age_min,t)}</div>
-        <div class="lead">${esc(plainRain(rn))}</div>
-        ${plainNowcast(nc)?'<div class="lead q">'+esc(plainNowcast(nc))+'</div>':''}
-        <div class="negs">
-          ${neg(lt.none_detected,'No lightning anywhere','Lightning detected')}
-          ${neg(lt.no_thundery,'No thundery showers forecast','Thundery showers forecast')}
-        </div>
-        ${work(rainWork)}
-      </div>
-
-      <div class="tile">
-        <div class="head"><span class="eyebrow">What the radar sees</span><span class="age">${ageText(rd.stamp||rd.age_min,t)}</span></div>
-        <div class="bigrow">
-          <div><span class="big word">${esc(plainCover(rd.echo_pct))}</span><span class="lbl">showing on the radar around here right now</span></div>
-        </div>
-        <div class="kv">
-          <span class="k">Heaviest of it</span><span class="v words">${esc(peakPlain)}</span>
-          <span class="k">Nearest to Bedok</span><span class="v words">${esc(plainNear(rd.bedok_km,rd.bedok_brg,rd.bedok_label))}</span>
-          <span class="k">Nearest to Tampines</span><span class="v words">${esc(plainNear(rd.tampines_km,rd.tampines_brg,rd.tampines_label))}</span>
-          <span class="k">Heading our way?</span><span class="v words">${esc(rd.motion||'not assessed')}</span>
-          ${rd.upstream?'<span class="k">Anything further out?</span><span class="v words">'+esc(rd.upstream)+'</span>':''}
-        </div>
-        ${spark}
-        ${work(radarWork)}
-      </div>
-    </div>
-
-    ${hazeTile(o.haze,t)}
+      ${hazeTile(o.haze,t)}
+    </details>
 
     <section class="hist">
       <h2>Run log</h2>
-      ${logTable(todayRows)}
+      ${logTable(todayAll)}
       ${earlierRows.length?'<details class="earlier"><summary><b>Earlier runs</b> <span>'+earlierRows.length+' more, back to '+dmy(earlierRows[earlierRows.length-1].date)+'</span><span class="tally">'+earlierTally+'</span></summary>'+logTable(earlierRows)+'</details>':''}
     </section>
 
@@ -699,13 +849,13 @@ footer .mono{color:var(--ink-2)}
         <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${scored.length} scored of ${rows.length} runs</span></div>
         <div class="bigrow">
           <div><span class="big" style="color:var(--good)">${tally.hit}</span><span class="lbl">right</span></div>
-          <div><span class="big" style="color:var(--warn)">${tally.partial}</span><span class="lbl">half right</span></div>
+          <div><span class="big" style="color:var(--warn)">${tally.partial+tally.scope}</span><span class="lbl">part of the window</span></div>
           <div><span class="big" style="color:var(--crit)">${tally.miss}</span><span class="lbl">wrong</span></div>
           ${tally.unscored?'<div><span class="big" style="color:var(--dim)">'+tally.unscored+'</span><span class="lbl">could not be marked</span></div>':''}
         </div>
         <div class="strip">${strip}</div>
-        <div class="legend"><span><b>✓</b> right</span><span><b>~</b> half right</span><span><b>✕</b> wrong</span><span><b>·</b> nothing to mark</span><span>underline = 0700 run</span></div>
-        ${lastScore?'<div class="scorenote"><b>Last marked:</b> '+esc(lastScore.score.of)+' → '+esc(lastScore.score.verdict||'')+(lastScore.score.mechanism?'. '+esc(lastScore.score.mechanism):'')+'</div>':'<div class="scorenote">No run has marked a predecessor yet.</div>'}
+        <div class="legend"><span><b>✓</b> right</span><span><b>~</b> part of the window</span><span><b>✕</b> wrong</span><span><b>·</b> nothing to mark</span><span>underline = 0700 run</span></div>
+        ${lastScore?'<div class="scorenote"><b>Last marked:</b> '+esc(lastScore.score.of)+' → '+esc(lastScore.score.verdict||'')+(lastScore.score.mechanism_note||lastScore.score.mechanism?'. '+esc(lastScore.score.mechanism_note||lastScore.score.mechanism):'')+'</div>':'<div class="scorenote">No run has marked a predecessor yet.</div>'}
       </div>
     </section>
 
@@ -720,7 +870,7 @@ footer .mono{color:var(--ink-2)}
   // ---- data source -------------------------------------------------------
   // The page reads straight from a small Supabase store that a cloud-only
   // scheduled run mirrors from the reading database after each reading. There
-  // is no live subscription: the page re-fetches on a timer and says plainly
+  // is no live subscription: the page reads once on load and says plainly
   // how old the last mirror was, because a mirror that stops would otherwise
   // leave a confident-looking page frozen in the past.
   // The key below is Supabase's publishable key: public by design, read-only
