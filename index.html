@@ -17,6 +17,26 @@
   readings and meta). This page reads those tables with the public key; it
   has no live subscription and says so when the mirror is old.
 
+  15/09/26  PANELS ANSWER A QUESTION, and one vocabulary everywhere.
+            Three changes, all from Gary reading the live page.
+            (1) Each instrument panel now prints the question it exists to
+            answer and, when the reading supplies says.*, the reading's own
+            one-sentence answer above the measurement. Documents filed before
+            today carry no says block, so those panels show the question and
+            fall back to the measured sentence.
+            (2) Radar versus gauges. The page printed "no rain at any of the 58
+            gauges" above "moderate rain, over less than half a square
+            kilometre" and left the reader to referee two instruments. When
+            every gauge is dry and the peak band rests on under 25 px, the band
+            name is suppressed and the page explains, in words, that the water
+            is aloft and not landing.
+            (3) ONE vocabulary. The page was showing HIT, hit, part and right
+            for the same idea in three places, two of which counted a different
+            thing from the third. The interim mark has left the run log for the
+            per-run fold, the earlier-runs tally now counts closes in the same
+            plain words as the track record, stored `partial` is translated on
+            read rather than rewritten in the store, and the underline note has
+            its own line away from the verdict words.
   14/09/26  ANSWERS FIRST. Improvement item 2. The page used to open with the
             lean sentence and then three instrument tiles, so a reader met the
             wind, the gauges and the radar before learning whether they needed
@@ -199,6 +219,14 @@ details.work>summary:hover{color:var(--ink-2)}
 .workbody .kv{font-size:13px;margin-bottom:8px}
 .lead{font-size:15px;color:var(--ink)}
 .lead.q{color:var(--ink-2);font-size:14px}
+/* 15/09/26, panels answer a question. The question is the panel's job, printed
+   so the reader knows what they are being told; the answer sentence is the
+   reading's own words; the measurement drops to supporting text underneath. */
+.qn{font-family:var(--fd);font-weight:600;font-size:13px;color:var(--ink-2);margin-top:2px}
+.says{font-size:15px;color:var(--ink);font-weight:500}
+.recon{margin-top:8px;font-size:13px;color:var(--ink-2);padding-left:10px;border-left:3px solid var(--line)}
+.legendnote{font-size:12px;color:var(--muted);margin-top:4px}
+.advis{margin-top:6px;font-size:13px;color:var(--ink-2);padding-left:10px;border-left:3px solid var(--line)}
 
 .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--dim-bg);color:var(--dim);white-space:nowrap}
 .chip.good{background:var(--good-bg);color:var(--good)}
@@ -368,6 +396,16 @@ footer .mono{color:var(--ink-2)}
     if(c.startsWith('mod')) return 'moderate'; if(c.includes('degrad')) return 'degraded'; if(c.startsWith('low')) return 'low'; return 'unknown'; }
   function chipFor(cl){ return {high:'good','mod-high':'good',moderate:'warn',low:'crit',degraded:'crit',unknown:''}[cl]||''; }
   function verdictClass(v){ v=String(v||'').toLowerCase(); if(v.startsWith('hit')||v.startsWith('verif')) return 'hit'; if(v.startsWith('miss')||v.startsWith('fail')) return 'miss'; if(v.startsWith('part')) return 'partial'; if(v.startsWith('scope')) return 'scope'; return 'unscored'; }
+  // ONE VOCABULARY on the reader-facing surface, 15/09/26. The store keeps the
+  // closed set from claude/forecasting-model.md section 5, HIT / MISS / SCOPE /
+  // UNSCORED, plus `partial` on the 15 records filed before 14/09/26 under the
+  // older rules. Those stored words are what the retrospective queries and they
+  // are NEVER rewritten; they are translated here, at display time, so the page
+  // says one thing in one language. Gary, 15/09/26: "the run log says 'hit' and
+  // the below legend says right wrong not close and underline. so which is it?"
+  const VERDICTWORD={hit:'right',miss:'wrong',partial:'part of the window',
+                     scope:'part of the window',unscored:'could not be marked'};
+  function verdictWord(v){ return VERDICTWORD[verdictClass(v)]||'could not be marked'; }
   function compass(deg){ if(deg==null) return '';
     return '<svg class="compass" viewBox="0 0 16 16" aria-hidden="true"><g transform="rotate('+(deg)+' 8 8)"><path d="M8 1.5 L11 9 L8 7.5 L5 9 Z" fill="currentColor"/><path d="M8 7.5 L11 9 L8 14.5 L5 9 Z" fill="currentColor" opacity=".35"/></g></svg>'; }
   function dirName(d){ if(d==null) return ''; const n=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']; return n[Math.round(d/22.5)%16]; }
@@ -517,6 +555,19 @@ footer .mono{color:var(--ink-2)}
     if(ms==null) return '<span class="age">age n/a</span>';
     return '<span class="age">'+fmtAge(ms)+' old</span>'; }
 
+  // 15/09/26, claude/forecasting-model.md 1.6. Every panel answers ONE fixed
+  // question and says the answer in a sentence before any measurement. Gary,
+  // 15/09/26: "each panel can answer a question, what does each of the machine
+  // logs say about the forecast or how do each of these machine logs influence
+  // the forecast in their own way." The reading writes that sentence into
+  // says.*; documents filed before this carry no says block, so the panel falls
+  // back to its measured sentence and still prints the question, which is the
+  // half that needed no new field and works on every document already stored.
+  function saysBlock(says,key,measured){
+    const s=says&&says[key];
+    if(s) return '<div class="says">'+esc(s)+'</div>'+(measured?'<div class="lead q">'+esc(measured)+'</div>':'');
+    return measured?'<div class="lead">'+esc(measured)+'</div>':''; }
+
   // one fold, used by every panel
   function work(inner){ if(!inner) return '';
     return '<details class="work"'+(DETAIL?' open':'')+'><summary>Show the working</summary><div class="workbody">'+inner+'</div></details>'; }
@@ -588,6 +639,7 @@ footer .mono{color:var(--ink-2)}
         ${auditRow}
         ${line(rel==null?'na':(rel>-45*60000?'ok':'bad'), rel==null?'?':(rel>-45*60000?'✓':'!'), 'Next reading due', rel==null?'unknown':(rel>0?'in '+fmtAge(rel):fmtAge(-rel)+' overdue'))}
         ${line(recCount?'na':'ok', recCount?'~':'✓', 'Readings the backup had to fill in', recCount?recCount+' of the last '+rows.length:'none needed')}
+        ${Array.isArray(HB&&HB.advisories)&&HB.advisories.length?HB.advisories.map(a=>'<div class="advis">'+esc(a)+'</div>').join(''):''}
         ${HB&&HB.note?'<div class="foot">'+esc(HB.note)+'</div>':''}
         <div class="foot">Five readings a day, a backup sweep 30 to 60 min behind each, and a daily self-check at 0805 hrs that also inspects the eight scheduled tasks themselves. The self-check reports every morning, pass or fail. Silence for more than 26 hours means the checker itself has stopped.</div>
       </div>
@@ -609,6 +661,7 @@ footer .mono{color:var(--ink-2)}
     const o=latest.obs||{}; const w=o.wind||{}, rn=o.rain||{}, rd=o.radar||{}, lt=o.lightning||{}, nc=o.nowcast||{};
     const cc=confClass(latest.conf_level||latest.confidence);
     const A=latest.answers||null;
+    const SAYS=latest.says||{};
 
     // banner, most severe first: missed run, then degraded, then a silent audit
     const nx=nextExpected(latest); const st=hbState(); const ga=genAge();
@@ -669,9 +722,26 @@ footer .mono{color:var(--ink-2)}
     const pkAreaText = pkArea==null ? ''
       : pkArea<0.5 ? ', over less than half a square kilometre'
       : ', over about '+(pkArea<10?pkArea.toFixed(1):String(Math.round(pkArea)))+' km\u00B2';
+    // forecasting-model.md 1.7, added 15/09/26. The page used to print "no rain
+    // at any of the 58 gauges" directly above "moderate rain, over less than
+    // half a square kilometre" and leave the reader to referee two instruments.
+    // They do not actually contradict: radar measures water ALOFT over a patch,
+    // a gauge measures what LANDED in a tube over the past hour, and a small
+    // patch that evaporates on the way down, or sits between gauges, produces
+    // exactly that pair. Two-part test, both must hold: every gauge dry, and
+    // the peak band's patch under 25 px, which at 0.29 km per pixel is about
+    // 2 km2. The 3 px speckle floor above is a DIFFERENT rule and does not
+    // cover this case: the one that prompted it was about 6 px and cleared that
+    // floor legitimately.
+    const gaugesDry = rn.wet===0 && (rn.wet_midnight===0 || rn.wet_midnight==null);
+    const aloftOnly = !speckle && pk!=null && pk<25 && gaugesDry;
     const peakPlain = pk==null ? 'not measured'
       : speckle ? 'nothing worth naming, just a stray spot or two'
+      : aloftOnly ? 'a small patch of water in the air that is not reaching the ground'
       : (plainBand(pl)||'unclassified')+' rain'+pkAreaText;
+    const reconLine = SAYS.reconciliation ? '<div class="recon">'+esc(SAYS.reconciliation)+'</div>'
+      : aloftOnly ? '<div class="recon">Radar is picking up a little water in the air, but none of it is landing: every gauge on the island is dry. Radar sees rain aloft; a gauge only catches what reaches the ground.</div>'
+      : '';
 
     const neg=(val,okText,badText)=> val===true?'<div class="neg ok"><i>✓</i>'+okText+'</div>': val===false?'<div class="neg bad"><i>!</i>'+badText+'</div>':'<div class="neg na"><i>?</i>'+okText+' <small>(not read)</small></div>';
 
@@ -689,9 +759,15 @@ footer .mono{color:var(--ink-2)}
     const todayRows=rows.filter(r=>r.date===today);
     const earlierRows=rows.filter(r=>r.date!==today).slice(0,60);
     const et={hit:0,miss:0,partial:0,scope:0,unscored:0,none:0,rec:0};
-    earlierRows.forEach(r=>{ et[hasScore(r)?verdictClass(r.score.verdict):'none']++; if(r.recovery) et.rec++; });
-    const earlierTally=[et.hit?et.hit+' hit':'', (et.partial+et.scope)?(et.partial+et.scope)+' part':'', et.miss?et.miss+' miss':'',
-                        et.rec?et.rec+' recovery':''].filter(Boolean).join(' · ')||'nothing scored';
+    // 15/09/26: this counted score.verdict in raw words ("38 hit - 15 part"),
+    // which is a DIFFERENT measure from the track record below and printed
+    // `part`, a word section 5 of the forecasting model forbids. It now counts
+    // the same thing the track record counts, the closed verdicts, and says it
+    // in the same words.
+    earlierRows.forEach(r=>{ if(hasClose(r)) et[verdictClass(r.close.verdict)]++; else et.none++; if(r.recovery) et.rec++; });
+    const earlierTally=[et.hit?et.hit+' right':'', et.miss?et.miss+' wrong':'',
+                        et.none?et.none+' not closed yet':'',
+                        et.rec?et.rec+' filled in by the backup':''].filter(Boolean).join(' · ')||'nothing closed yet';
 
     // Item 3, 14/09/26: a slot that never filed used to be simply absent, so the
     // only trace of the 09/09 1400 gap was a banner that had long since moved on.
@@ -709,12 +785,11 @@ footer .mono{color:var(--ink-2)}
       if(r.missed) return '<tr class="missed"><td class="when">'+dmy(r.date)+' '+esc(r.at)+'</td>'
         + '<td class="kindc"><span class="chip kind">'+esc(r.at)+'</span></td>'
         + '<td class="confc"><span class="chip crit">missed</span></td>'
-        + '<td class="lean-cell">No reading filed for this slot. Either the run did not fire, or it fired and the step that copies it here did not.</td>'
-        + '<td class="scorec"></td></tr>';
+        + '<td class="lean-cell">No reading filed for this slot. Either the run did not fire, or it fired and the step that copies it here did not.</td></tr>';
       const c=confClass(r.conf_level||r.confidence); const v=hasScore(r)?verdictClass(r.score.verdict):null;
-      return '<tr><td class="when">'+dmy(r.date)+' '+esc(r.time)+'</td><td class="kindc"><span class="chip kind">'+shortKind(r)+'</span>'+(r.recovery?' <span class="chip warn">rec</span>':'')+'</td><td class="confc"><span class="chip '+chipFor(c)+'">'+esc(r.conf_level||c)+'</span></td><td class="lean-cell"><details'+(DETAIL?' open':'')+'><summary>'+esc((r.answers&&r.answers.consequence)||r.lean||'')+'</summary><div>'+esc((r.lean&&r.answers&&r.answers.consequence?r.lean+'\n':'')+(r.confidence?'Confidence: '+r.confidence+'\n':'')+(Array.isArray(r.unresolved)?r.unresolved.map(u=>'• '+u).join('\n'):'')+(r.route?'\nRoute '+r.route:''))+'</div></details></td><td class="scorec">'+(v?'<span class="chip '+({hit:'good',miss:'crit',partial:'warn',scope:'warn',unscored:''}[v])+'">'+esc(r.score.verdict)+'</span>'+(r.score.mechanism?'<div style="font-size:12px;color:var(--muted);margin-top:3px">'+esc(r.score.mechanism)+'</div>':''):'<span class="age">not scored</span>')+'</td></tr>'; }
+      return '<tr><td class="when">'+dmy(r.date)+' '+esc(r.time)+'</td><td class="kindc"><span class="chip kind">'+shortKind(r)+'</span>'+(r.recovery?' <span class="chip warn">rec</span>':'')+'</td><td class="confc"><span class="chip '+chipFor(c)+'">'+esc(r.conf_level||c)+'</span></td><td class="lean-cell"><details'+(DETAIL?' open':'')+'><summary>'+esc((r.answers&&r.answers.consequence)||r.lean||'')+'</summary><div>'+esc((r.lean&&r.answers&&r.answers.consequence?r.lean+'\n':'')+(r.confidence?'Confidence: '+r.confidence+'\n':'')+(Array.isArray(r.unresolved)?r.unresolved.map(u=>'• '+u).join('\n'):'')+(r.route?'\nRoute '+r.route:'')+(v?'\n\nFirst look at '+r.score.of+', taken while its window was still open: '+verdictWord(r.score.verdict)+(r.score.mechanism?'. '+r.score.mechanism:''):''))+'</div></details></td></tr>'; }
     function logTable(rs){ if(!rs.length) return '<div class="empty">No runs filed yet today. The first is the 0700 hrs day-ahead.</div>';
-      return '<div class="tablewrap"><table><thead><tr><th>Run</th><th>Kind</th><th>How sure</th><th>The call</th><th>Marking the run before</th></tr></thead><tbody>'+rs.map(logRow).join('')+'</tbody></table></div>'; }
+      return '<div class="tablewrap"><table><thead><tr><th>Run</th><th>Kind</th><th>How sure</th><th>The call</th></tr></thead><tbody>'+rs.map(logRow).join('')+'</tbody></table></div>'; }
     const todayAll=todayRows.concat(missedToday()).sort((a,b)=>String(b.time||b.at).localeCompare(String(a.time||a.at)));
 
     // ---- folds: every technical string and raw figure, verbatim -------------
@@ -813,7 +888,8 @@ footer .mono{color:var(--ink-2)}
       <div class="grid three">
         <div class="tile">
           <div class="head"><span class="eyebrow">Wind</span>${ageSpan(w.stamp||w.age_min,t)}</div>
-          <div class="lead">${esc(plainWind(w))}</div>
+          <div class="qn">Can a storm fire here today, and is that changing?</div>
+          ${saysBlock(SAYS,'wind',plainWind(w))}
           ${w.R!=null?'<div class="lead q">'+esc(plainSteady(w.R))+'</div>':''}
           ${gate}
           ${work(windWork)}
@@ -821,8 +897,11 @@ footer .mono{color:var(--ink-2)}
 
         <div class="tile">
           <div class="head"><span class="eyebrow">Rain and lightning</span>${ageSpan(rn.stamp||rn.age_min,t)}</div>
-          <div class="lead">${esc(plainRain(rn))}</div>
+          <div class="qn">Is anything actually falling right now?</div>
+          ${saysBlock(SAYS,'rain',plainRain(rn))}
           ${plainNowcast(nc)?'<div class="lead q">'+esc(plainNowcast(nc))+'</div>':''}
+          <div class="qn" style="margin-top:10px">Is anything electrically active, and is it near?</div>
+          ${saysBlock(SAYS,'lightning','')}
           <div class="negs">
             ${neg(lt.none_detected,'No lightning anywhere','Lightning detected')}
             ${neg(lt.no_thundery,'No thundery showers forecast','Thundery showers forecast')}
@@ -832,6 +911,8 @@ footer .mono{color:var(--ink-2)}
 
         <div class="tile">
           <div class="head"><span class="eyebrow">What the radar sees</span><span class="age">${ageText(rd.stamp||rd.age_min,t)}</span></div>
+          <div class="qn">Is anything heading here, and when does it arrive?</div>
+          ${saysBlock(SAYS,'radar','')}
           <div class="bigrow">
             <div><span class="big word">${esc(plainCover(rd.echo_pct))}</span><span class="lbl">showing on the radar around here right now</span></div>
           </div>
@@ -842,6 +923,7 @@ footer .mono{color:var(--ink-2)}
             <span class="k">Heading our way?</span><span class="v words">${esc(rd.motion||'not assessed')}</span>
             ${rd.upstream?'<span class="k">Anything further out?</span><span class="v words">'+esc(rd.upstream)+'</span>':''}
           </div>
+          ${reconLine}
           ${spark}
           ${work(radarWork)}
         </div>
@@ -860,13 +942,15 @@ footer .mono{color:var(--ink-2)}
       <h2>Track record</h2>
       <div class="tile">
         <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${closed.length} closed of ${rows.length} runs</span></div>
+        <div class="lead q">This is the final verdict on each call, taken only after its whole window has passed. The run log above carries the first look, taken a few hours earlier while the window was still open, and the two will not always agree.</div>
         <div class="bigrow">
           <div><span class="big" style="color:var(--good)">${tally.hit}</span><span class="lbl">right</span></div>
           <div><span class="big" style="color:var(--crit)">${tally.miss}</span><span class="lbl">wrong</span></div>
           ${tally.unscored?'<div><span class="big" style="color:var(--dim)">'+tally.unscored+'</span><span class="lbl">could not be marked</span></div>':''}
         </div>
         <div class="strip">${strip}</div>
-        <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>·</b> not closed yet</span><span>underline = 0700 run</span></div>
+        <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>·</b> not closed yet</span></div>
+        <div class="legendnote">An underline marks the 0700 hrs run of that day.</div>
         ${lastClose?'<div class="scorenote"><b>Last closed:</b> '+esc(lastClose.close.of)+' → '+esc(lastClose.close.verdict||'')+(lastClose.close.note?'. '+esc(lastClose.close.note):'')+'</div>':'<div class="scorenote">No call has been closed yet. A call is only marked right or wrong once its whole window has passed, which happens about six hours after it was made.</div>'}
         <div class="foot">A call is judged only after the window it covered has finished, so tonight's readings stay unmarked until tomorrow. Interim checks taken while a window is still running are in the run log, not counted here.</div>
       </div>
