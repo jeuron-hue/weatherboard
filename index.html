@@ -693,7 +693,7 @@ footer .mono{color:var(--ink-2)}
     const stripRows=rows.slice(0,28).reverse();
     const strip=stripRows.map(r=>{ const v=hasClose(r)?verdictClass(r.close.verdict):'none';
       const ch={hit:'✓',miss:'✕',partial:'~',scope:'~',unscored:'?',none:'·'}[v];
-      const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasClose(r)?' closed '+r.close.of+': '+(r.close.verdict||'')+(r.close.note?' ('+r.close.note+')':''):' (closed nothing)');
+      const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasClose(r)?' closed '+r.close.of+': '+verdictWord(r.close.verdict)+(r.close.note?' ('+r.close.note+')':''):' (closed nothing)');
       return '<div class="sq '+(v==='none'?'':(v==='scope'?'partial':v))+(r.kind==='day-ahead'?' day':'')+'" title="'+esc(title)+'">'+ch+'</div>'; }).join('');
     const lastScore=scored[0]; const lastClose=closed[0];
 
@@ -799,7 +799,7 @@ footer .mono{color:var(--ink-2)}
       + (latest.mechanism&&latest.mechanism.expected?'<p><b>Mechanism expected.</b> <span class="mono">'+esc(latest.mechanism.expected)+'</span>'+(Array.isArray(latest.mechanism.considered)&&latest.mechanism.considered.length?'. Considered: <span class="mono">'+esc(latest.mechanism.considered.join(', '))+'</span>':'')+'</p>':'')
       + (Array.isArray(latest.unresolved)&&latest.unresolved.length?'<p><b>Unresolved.</b></p><ul>'+latest.unresolved.map(u=>'<li>'+esc(u)+'</li>').join('')+'</ul>':'')
       + (latest.next_data?'<p><b>What would settle it.</b> '+esc(latest.next_data)+'</p>':'')
-      + (latest.score&&latest.score.of?'<p><b>Marking the previous run.</b> '+esc(latest.score.of)+' → '+esc(latest.score.verdict||'')+(latest.score.scope?' ('+esc(latest.score.scope)+')':'')+(latest.score.mechanism_note||latest.score.mechanism?'. '+esc(latest.score.mechanism_note||latest.score.mechanism):'')+'</p>':'')
+      + (latest.score&&latest.score.of?'<p><b>First look at the previous run.</b> '+esc(latest.score.of)+', taken while its window was still open: '+esc(verdictWord(latest.score.verdict))+(latest.score.scope?' ('+esc(latest.score.scope)+')':'')+(latest.score.mechanism_note||latest.score.mechanism?'. '+esc(latest.score.mechanism_note||latest.score.mechanism):'')+'</p>':'')
       + (latest.score&&latest.score.acted_outcome?'<p><b>What a reader acting on it got.</b> '+esc(latest.score.acted_outcome)+'</p>':'')
       + (latest.route?'<p><b>Browser route.</b> '+esc(latest.route)+'</p>':'')
       + (latest.filed?'<p><b>Full reading.</b> <span class="mono">'+esc(latest.filed)+'</span></p>':'');
@@ -951,7 +951,7 @@ footer .mono{color:var(--ink-2)}
         <div class="strip">${strip}</div>
         <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>·</b> not closed yet</span></div>
         <div class="legendnote">An underline marks the 0700 hrs run of that day.</div>
-        ${lastClose?'<div class="scorenote"><b>Last closed:</b> '+esc(lastClose.close.of)+' → '+esc(lastClose.close.verdict||'')+(lastClose.close.note?'. '+esc(lastClose.close.note):'')+'</div>':'<div class="scorenote">No call has been closed yet. A call is only marked right or wrong once its whole window has passed, which happens about six hours after it was made.</div>'}
+        ${lastClose?'<div class="scorenote"><b>Last closed:</b> '+esc(lastClose.close.of)+', judged '+esc(verdictWord(lastClose.close.verdict))+(lastClose.close.note?'. '+esc(lastClose.close.note):'')+'</div>':'<div class="scorenote">No call has been closed yet. A call is only marked right or wrong once its whole window has passed, which happens about six hours after it was made.</div>'}
         <div class="foot">A call is judged only after the window it covered has finished, so tonight's readings stay unmarked until tomorrow. Interim checks taken while a window is still running are in the run log, not counted here.</div>
       </div>
     </section>
