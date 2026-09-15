@@ -733,7 +733,16 @@ footer .mono{color:var(--ink-2)}
     // 2 km2. The 3 px speckle floor above is a DIFFERENT rule and does not
     // cover this case: the one that prompted it was about 6 px and cleared that
     // floor legitimately.
-    const gaugesDry = rn.wet===0 && (rn.wet_midnight===0 || rn.wet_midnight==null);
+    // 15/09/26 2135: this also required wet_midnight to be zero, which is
+    // STRICTER than forecasting-model.md 1.7 and wrong. Rain that fell
+    // somewhere on the island earlier in the day says nothing about whether
+    // what is on the radar right now is reaching the ground. Measured on the
+    // 2112 night reading: 0 of 60 wet in the past hour, 4 of 69 since
+    // midnight and all of them far to the north, peak band moderate on 11 px.
+    // The old condition printed "moderate rain, over about 0.9 km2" directly
+    // beside a past-hour dry line, which is the exact pair this exists to
+    // prevent. Past hour only.
+    const gaugesDry = rn.wet===0;
     const aloftOnly = !speckle && pk!=null && pk<25 && gaugesDry;
     const peakPlain = pk==null ? 'not measured'
       : speckle ? 'nothing worth naming, just a stray spot or two'
