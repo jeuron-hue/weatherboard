@@ -1042,7 +1042,7 @@ footer .mono{color:var(--ink-2)}
   async function load(){
     try{
       const [r,m]=await Promise.all([
-        fetch(SB_URL+'/rest/v1/readings?select=doc&order=ts.desc&limit=60',{headers:SB_H,cache:'no-store'}),
+        fetch(SB_URL+'/rest/v1/readings?select=id,doc&order=ts.desc&limit=60',{headers:SB_H,cache:'no-store'}),
         fetch(SB_URL+'/rest/v1/meta?select=id,doc',{headers:SB_H,cache:'no-store'})]);
       if(!r.ok) throw new Error('readings HTTP '+r.status);
       if(!m.ok) throw new Error('meta HTTP '+m.status);
@@ -1051,7 +1051,10 @@ footer .mono{color:var(--ink-2)}
       HB=byId['audit-heartbeat']||null;
       GEN=(byId['publish-heartbeat']||{}).ts||null;
       FETCH_ERR=null;
-      ROWS=(Array.isArray(rows)?rows:[]).map(x=>x.doc).filter(Boolean);
+      // 23/09/26: the row id is the record's id. One stored doc
+      // (2026-09-22-0717-day-ahead) carries no id inside it, so the track record
+      // could not match its late close to it. Take the row id when the doc has none.
+      ROWS=(Array.isArray(rows)?rows:[]).map(x=>x.doc?Object.assign({id:x.id},x.doc):null).filter(Boolean);
       render();
       $('#storeinfo').textContent=ROWS.length+' readings · '+genWord()+' · page read at '+loadStamp()+' hrs, reload for newer';
     }catch(e){
