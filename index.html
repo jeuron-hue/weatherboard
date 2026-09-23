@@ -280,7 +280,7 @@ details.work>summary:hover{color:var(--ink-2)}
 .sq.hit{background:var(--good-bg);color:var(--good)}
 .sq.miss{background:var(--crit-bg);color:var(--crit)}
 .sq.partial{background:var(--warn-bg);color:var(--warn)}
-.sq.day{border-bottom:2px solid var(--line)}
+.sq.day::after{content:"";position:absolute;left:4px;right:4px;bottom:2px;height:2px;border-radius:1px;background:currentColor;opacity:.95}
 .legend{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
 .legend span b{font-family:var(--fd)}
 .scorenote{font-size:13px;color:var(--ink-2)}
