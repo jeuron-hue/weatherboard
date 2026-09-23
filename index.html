@@ -281,6 +281,17 @@ details.work>summary:hover{color:var(--ink-2)}
 .sq.miss{background:var(--crit-bg);color:var(--crit)}
 .sq.partial{background:var(--warn-bg);color:var(--warn)}
 .sq.day::after{content:"";position:absolute;left:4px;right:4px;bottom:2px;height:2px;border-radius:1px;background:currentColor;opacity:.95}
+.mgwrap{overflow-x:auto;margin:4px 0 8px;padding-bottom:4px}
+.mgrid{display:grid;gap:3px;align-items:center;width:max-content}
+.mgrid .sq{width:22px;height:22px;font-size:10px}
+.mgs{font-family:var(--fd);font-size:11px;color:var(--muted);padding-right:8px;position:sticky;left:0;background:var(--surface);z-index:1;align-self:stretch;display:flex;align-items:center}
+.mgrid>div:first-child{position:sticky;left:0;background:var(--surface);z-index:1}
+.mgd{font-family:var(--fd);font-size:10px;color:var(--muted);text-align:center}
+.mgd.today{color:var(--ink,inherit);font-weight:700}
+.mgtitle{font-size:12px;color:var(--muted);margin-top:6px}
+.sq.pre{opacity:.45}
+details.mgold{margin-top:6px}
+details.mgold summary{font-size:12px;color:var(--muted);cursor:pointer}
 .sgrid{display:grid;grid-template-columns:auto repeat(5,34px);gap:5px;align-items:center;justify-content:start;margin:6px 0 8px}
 .sgrid .sq{width:34px;height:26px}
 .sgh{font-family:var(--fd);font-size:11px;color:var(--muted);text-align:center}
@@ -377,6 +388,7 @@ footer .mono{color:var(--ink-2)}
   const pad=n=>String(n).padStart(2,'0');
   const SGT=8*60;
   let ROWS=null, HB=undefined; // HB undefined = not loaded yet, null = absent
+  let GRID=null; // 23/09/26: light rows (id, kind, date, time, close, closes_deferred) for every reading, for the month tables
 
   // Plain by default. The technical layer is one click away and the choice sticks
   // per browser. Every fold below renders open when this is true.
@@ -701,7 +713,7 @@ footer .mono{color:var(--ink-2)}
     // maps each closed reading id to that. The tally counts calls, not closers,
     // so a call closed late is counted once, with its real verdict.
     const FINAL={};
-    rows.slice().reverse().forEach(r=>{
+    (GRID||rows).slice().reverse().forEach(r=>{
       const put=c=>{ if(!c||!c.of||/^(none|n\/a|-)$/i.test(String(c.of))) return;
         const k=String(c.of), vc=verdictClass(c.verdict), prev=FINAL[k];
         if(prev&&vc!=='hit'&&vc!=='miss'&&(prev.vc==='hit'||prev.vc==='miss')) return;
@@ -726,18 +738,36 @@ footer .mono{color:var(--ink-2)}
     // 23/09/26 1250 hrs, Gary: group the tiles into columns under the five
     // slots. One row per day, newest at the top, one column per slot. A
     // recovery re-run shows as that slot's tile (the newest run for the slot).
+    // 23/09/26 1520 hrs, Gary: times as rows, dates as columns, one table per
+    // month; the current month shows, earlier months fold away. Each tile is
+    // that run's own call. The big numbers count the current month's tiles.
+    // Runs filed before closing began (14/09/26 2116 hrs) were never meant to
+    // be closed and show as a dash, outside the counts.
     const SLOTCOLS=[['day-ahead','0700'],['mid-morning','1045'],['convection','1400'],['evening','1745'],['night','2100']];
-    const gDates=[...new Set(rows.map(r=>r.date).filter(Boolean))].sort().reverse().slice(0,7);
-    const shownRuns=[];
-    const gridRows=gDates.map(d=>({d:d,cells:SLOTCOLS.map(([k])=>{ const r=rows.find(x=>x.date===d&&x.kind===k); if(r) shownRuns.push(r); return r||null; })}));
-    const ownTally={hit:0,miss:0,wait:0,none:0}; shownRuns.forEach(r=>ownTally[ownOf(r).k]++);
-    const notDueYet=(d,at)=>{ if(d!==todayStr()) return false; const n=sgtNow(), due=new Date(n); due.setHours(+at.slice(0,2),+at.slice(2),0,0); return n.getTime()<due.getTime()+45*60000; };
-    const tile=(r,d,at)=>{ if(!r) return notDueYet(d,at)?'<div class="sq future" title="'+esc(dmy(d)+' '+at+' hrs: not run yet')+'"></div>':'<div class="sq gap" title="'+esc(dmy(d)+' '+at+' hrs: no run filed')+'"></div>';
-      const o=ownOf(r); const ch={hit:'✓',miss:'✕',wait:'?',none:'·'}[o.k];
-      const what=o.k==='none'?'not closed yet':o.k==='wait'?'waiting for a late close'+(o.f&&o.f.note?' ('+o.f.note+')':''):verdictWord(o.f.verdict)+', closed by '+o.f.by+(o.f.note?' ('+o.f.note+')':'');
-      return '<div class="sq '+(o.k==='hit'||o.k==='miss'?o.k:'')+'" title="'+esc(label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+': '+what)+'">'+ch+'</div>'; };
-    const strip='<div class="sgrid"><div></div>'+SLOTCOLS.map(c=>'<div class="sgh">'+c[1]+'</div>').join('')
-      +gridRows.map(g=>'<div class="sgd">'+dmy(g.d).slice(0,5)+'</div>'+g.cells.map((r,i)=>tile(r,g.d,SLOTCOLS[i][1])).join('')).join('')+'</div>';
+    const CLOSE_START=Date.parse('2026-09-14T21:16:00+08:00');
+    const src=GRID||rows;
+    const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const notDueYet=(d,at)=>{ if(d!==todayStr()) return d>todayStr(); const n=sgtNow(), due=new Date(n); due.setHours(+at.slice(0,2),+at.slice(2),0,0); return n.getTime()<due.getTime()+45*60000; };
+    const ownK=r=>{ const o=ownOf(r); if(o.k==='none'&&Date.parse(r.ts||'')<CLOSE_START) return {k:'pre'}; return o; };
+    const firstDate=src.map(r=>r.date).filter(Boolean).sort()[0]||todayStr();
+    const tile=(r,d,at)=>{ if(!r&&d<firstDate) return '<div class="sq future" title="'+esc(dmy(d)+': before the readings started')+'"></div>';
+      if(!r) return notDueYet(d,at)?'<div class="sq future" title="'+esc(dmy(d)+' '+at+' hrs: not run yet')+'"></div>':'<div class="sq gap" title="'+esc(dmy(d)+' '+at+' hrs: no run filed')+'"></div>';
+      const o=ownK(r); const ch={hit:'✓',miss:'✕',wait:'?',none:'·',pre:'–'}[o.k];
+      const what=o.k==='pre'?'filed before closing began on 14/09':o.k==='none'?'not closed yet':o.k==='wait'?'waiting for a late close'+(o.f&&o.f.note?' ('+o.f.note+')':''):verdictWord(o.f.verdict)+', closed by '+o.f.by+(o.f.note?' ('+o.f.note+')':'');
+      return '<div class="sq '+(o.k==='hit'||o.k==='miss'?o.k:(o.k==='pre'?'pre':''))+'" title="'+esc(label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+': '+what)+'">'+ch+'</div>'; };
+    const months=[...new Set(src.map(r=>String(r.date||'').slice(0,7)).filter(Boolean).concat([todayStr().slice(0,7)]))].sort().reverse();
+    const monthTable=ym=>{ const [y,mo]=ym.split('-').map(Number); const nd=new Date(y,mo,0).getDate();
+      const days=Array.from({length:nd},(_,i)=>ym+'-'+String(i+1).padStart(2,'0'));
+      const t={hit:0,miss:0,wait:0,none:0,pre:0}; const runs=[];
+      const body=SLOTCOLS.map(([k,at])=>'<div class="mgs">'+at+'</div>'+days.map(d=>{ const r=src.find(x=>x.date===d&&x.kind===k); if(r){ runs.push(r); t[ownK(r).k]++; } return tile(r,d,at); }).join('')).join('');
+      const head='<div></div>'+days.map(d=>'<div class="mgd'+(d===todayStr()?' today':'')+'">'+(+d.slice(8))+'</div>').join('');
+      return {t:t,runs:runs,html:'<div class="mgwrap"><div class="mgrid" style="grid-template-columns:auto repeat('+nd+',22px)">'+head+body+'</div></div>',title:MON[mo-1]+' '+y}; };
+    const curM=monthTable(months[0]);
+    const ownTally=curM.t; const shownRuns=curM.runs;
+    const olderM=months.slice(1).map(monthTable);
+    const tallyLine=t=>[t.hit+' right',t.miss+' wrong',t.wait?t.wait+' waiting for a late close':'',t.none?t.none+' not closed yet':'',t.pre?t.pre+' before closing began':''].filter(Boolean).join(' · ');
+    const strip='<div class="mgtitle">'+esc(curM.title)+'</div>'+curM.html
+      +olderM.map(m=>'<details class="mgold"><summary>'+esc(m.title)+': '+esc(tallyLine(m.t))+'</summary><div class="mgtitle">'+esc(m.title)+'</div>'+m.html+'</details>').join('');
     const lastScore=scored[0]; const lastClose=closed[0];
 
     // radar spark
@@ -994,7 +1024,7 @@ footer .mono{color:var(--ink-2)}
     <section class="hist">
       <h2>Track record</h2>
       <div class="tile">
-        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${ownTally.hit+ownTally.miss} closed of ${shownRuns.length} runs, last ${gDates.length} days</span></div>
+        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${ownTally.hit+ownTally.miss} closed of ${shownRuns.length-ownTally.pre} runs this month</span></div>
         <div class="lead q">This is the final verdict on each call, taken only after its whole window has passed. The run log above carries the first look, taken a few hours earlier while the window was still open, and the two will not always agree.</div>
         <div class="bigrow">
           <div><span class="big" style="color:var(--good)">${ownTally.hit}</span><span class="lbl">right</span></div>
@@ -1003,8 +1033,8 @@ footer .mono{color:var(--ink-2)}
           ${ownTally.none?'<div><span class="big" style="color:var(--dim)">'+ownTally.none+'</span><span class="lbl">not closed yet</span></div>':''}
         </div>
         ${strip}
-        <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>?</b> waiting for a late close</span><span><b>·</b> not closed yet</span></div>
-        <div class="legendnote">One row per day, newest at the top, one column per slot. Each tile shows how that run's own call held up. A red dashed outline means no run was filed for that slot; today's later slots stay blank until they run.</div>
+        <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>?</b> waiting for a late close</span><span><b>·</b> not closed yet</span><span><b>–</b> before closing began, 14/09</span></div>
+        <div class="legendnote">One row per slot, one column per day of the month. Each tile shows how that run's own call held up. A red dashed outline means no run was filed for that slot; slots still to come stay blank. Earlier months fold away below the table.</div>
         ${lastClose?'<div class="scorenote"><b>Last closed:</b> '+esc(lastClose.close.of)+', judged '+esc(verdictWord(lastClose.close.verdict))+(lastClose.close.note?'. '+esc(lastClose.close.note):'')+'</div>':'<div class="scorenote">No call has been closed yet. A call is only marked right or wrong once its whole window has passed, which happens about six hours after it was made.</div>'}
         <div class="foot">A call is judged only after the window it covered has finished, so tonight's readings stay unmarked until tomorrow. Interim checks taken while a window is still running are in the run log, not counted here.</div>
       </div>
@@ -1044,6 +1074,9 @@ footer .mono{color:var(--ink-2)}
       const [r,m]=await Promise.all([
         fetch(SB_URL+'/rest/v1/readings?select=id,doc&order=ts.desc&limit=60',{headers:SB_H,cache:'no-store'}),
         fetch(SB_URL+'/rest/v1/meta?select=id,doc',{headers:SB_H,cache:'no-store'})]);
+      // light rows for the month tables: every reading, only the fields the grid needs
+      try{ const g=await fetch(SB_URL+'/rest/v1/readings?select=id,ts,kind:doc->>kind,date:doc->>date,time:doc->>time,recovery:doc->recovery,close:doc->close,closes_deferred:doc->closes_deferred&order=ts.desc&limit=1000',{headers:SB_H,cache:'no-store'});
+        GRID=g.ok?(await g.json()).filter(x=>x&&x.id):null; }catch(e){ GRID=null; }
       if(!r.ok) throw new Error('readings HTTP '+r.status);
       if(!m.ok) throw new Error('meta HTTP '+m.status);
       const rows=await r.json(), meta=await m.json();
@@ -1056,6 +1089,8 @@ footer .mono{color:var(--ink-2)}
       // could not match its late close to it. Take the row id when the doc has none.
       ROWS=(Array.isArray(rows)?rows:[]).map(x=>x.doc?Object.assign({id:x.id},x.doc):null).filter(Boolean);
       render();
+      // on a narrow screen the month table scrolls; open it at today, not the 1st
+      document.querySelectorAll('.mgwrap').forEach(w=>{ const t=w.querySelector('.mgd.today'); if(t) w.scrollLeft=Math.max(0,t.offsetLeft-w.clientWidth+80); });
       $('#storeinfo').textContent=ROWS.length+' readings · '+genWord()+' · page read at '+loadStamp()+' hrs, reload for newer';
     }catch(e){
       FETCH_ERR=e.message||String(e);
