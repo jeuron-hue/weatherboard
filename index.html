@@ -281,6 +281,12 @@ details.work>summary:hover{color:var(--ink-2)}
 .sq.miss{background:var(--crit-bg);color:var(--crit)}
 .sq.partial{background:var(--warn-bg);color:var(--warn)}
 .sq.day::after{content:"";position:absolute;left:4px;right:4px;bottom:2px;height:2px;border-radius:1px;background:currentColor;opacity:.95}
+.sgrid{display:grid;grid-template-columns:auto repeat(5,34px);gap:5px;align-items:center;justify-content:start;margin:6px 0 8px}
+.sgrid .sq{width:34px;height:26px}
+.sgh{font-family:var(--fd);font-size:11px;color:var(--muted);text-align:center}
+.sgd{font-family:var(--fd);font-size:11px;color:var(--muted);padding-right:8px}
+.sq.gap{background:transparent;border:1px dashed var(--crit)}
+.sq.future{background:transparent}
 .legend{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
 .legend span b{font-family:var(--fd)}
 .scorenote{font-size:13px;color:var(--ink-2)}
@@ -708,10 +714,30 @@ footer .mono{color:var(--ink-2)}
     const deferredTitle=r=>(Array.isArray(r.closes_deferred)?r.closes_deferred:[]).filter(c=>c&&c.of).map(c=>'; also closed '+c.of+' late: '+verdictWord(c.verdict)).join('');
     const hasScore=r=>r.score&&r.score.of&&!/^(none|n\/a|-)$/i.test(String(r.score.of)); const scored=rows.filter(hasScore);
     const stripRows=rows.slice(0,28).reverse();
-    const strip=stripRows.map(r=>{ const v=rowVerdict(r); const f=finalOf(r);
-      const ch={hit:'✓',miss:'✕',partial:'~',scope:'~',unscored:'?',none:'·'}[v];
-      const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasClose(r)?' closed '+r.close.of+': '+verdictWord(r.close.verdict)+(r.close.note?' ('+r.close.note+')':'')+(f&&f.by&&f.by!==String(r.id||'')?'; closed later by '+f.by+': '+verdictWord(f.verdict):''):' (closed nothing)')+deferredTitle(r);
-      return '<div class="sq '+(v==='none'?'':(v==='scope'?'partial':v))+(r.kind==='day-ahead'?' day':'')+'" title="'+esc(title)+'">'+ch+'</div>'; }).join('');
+    // 23/09/26 1240 hrs, Gary: "4 could not be marked and 3 question marks are
+    // not the same thing". They were not: the tally counted every call closed
+    // anywhere in the 60 loaded runs, while each tile showed what ITS RUN had
+    // closed, over only the last 28. Now each tile is that run's OWN call, and
+    // the tally counts exactly the tiles shown, so the numbers and the tiles
+    // always agree. A call whose close was attempted but not yet made is
+    // WAITING (handed on to a later run), not "could not be marked".
+    const ownOf=r=>{ const f=FINAL[String(r.id||'')]; if(!f) return {k:'none'};
+      if(f.vc==='hit'||f.vc==='miss') return {k:f.vc,f:f}; return {k:'wait',f:f}; };
+    // 23/09/26 1250 hrs, Gary: group the tiles into columns under the five
+    // slots. One row per day, newest at the top, one column per slot. A
+    // recovery re-run shows as that slot's tile (the newest run for the slot).
+    const SLOTCOLS=[['day-ahead','0700'],['mid-morning','1045'],['convection','1400'],['evening','1745'],['night','2100']];
+    const gDates=[...new Set(rows.map(r=>r.date).filter(Boolean))].sort().reverse().slice(0,7);
+    const shownRuns=[];
+    const gridRows=gDates.map(d=>({d:d,cells:SLOTCOLS.map(([k])=>{ const r=rows.find(x=>x.date===d&&x.kind===k); if(r) shownRuns.push(r); return r||null; })}));
+    const ownTally={hit:0,miss:0,wait:0,none:0}; shownRuns.forEach(r=>ownTally[ownOf(r).k]++);
+    const notDueYet=(d,at)=>{ if(d!==todayStr()) return false; const n=sgtNow(), due=new Date(n); due.setHours(+at.slice(0,2),+at.slice(2),0,0); return n.getTime()<due.getTime()+45*60000; };
+    const tile=(r,d,at)=>{ if(!r) return notDueYet(d,at)?'<div class="sq future" title="'+esc(dmy(d)+' '+at+' hrs: not run yet')+'"></div>':'<div class="sq gap" title="'+esc(dmy(d)+' '+at+' hrs: no run filed')+'"></div>';
+      const o=ownOf(r); const ch={hit:'✓',miss:'✕',wait:'?',none:'·'}[o.k];
+      const what=o.k==='none'?'not closed yet':o.k==='wait'?'waiting for a late close'+(o.f&&o.f.note?' ('+o.f.note+')':''):verdictWord(o.f.verdict)+', closed by '+o.f.by+(o.f.note?' ('+o.f.note+')':'');
+      return '<div class="sq '+(o.k==='hit'||o.k==='miss'?o.k:'')+'" title="'+esc(label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+': '+what)+'">'+ch+'</div>'; };
+    const strip='<div class="sgrid"><div></div>'+SLOTCOLS.map(c=>'<div class="sgh">'+c[1]+'</div>').join('')
+      +gridRows.map(g=>'<div class="sgd">'+dmy(g.d).slice(0,5)+'</div>'+g.cells.map((r,i)=>tile(r,g.d,SLOTCOLS[i][1])).join('')).join('')+'</div>';
     const lastScore=scored[0]; const lastClose=closed[0];
 
     // radar spark
@@ -790,8 +816,9 @@ footer .mono{color:var(--ink-2)}
     // `part`, a word section 5 of the forecasting model forbids. It now counts
     // the same thing the track record counts, the closed verdicts, and says it
     // in the same words.
-    earlierRows.forEach(r=>{ if(hasClose(r)) et[rowVerdict(r)]++; else et.none++; if(r.recovery) et.rec++; });
+    earlierRows.forEach(r=>{ const k=(()=>{ const f=FINAL[String(r.id||'')]; return !f?'none':(f.vc==='hit'||f.vc==='miss')?f.vc:'unscored'; })(); et[k]++; if(r.recovery) et.rec++; });
     const earlierTally=[et.hit?et.hit+' right':'', et.miss?et.miss+' wrong':'',
+                        et.unscored?et.unscored+' waiting for a late close':'',
                         et.none?et.none+' not closed yet':'',
                         et.rec?et.rec+' filled in by the backup':''].filter(Boolean).join(' · ')||'nothing closed yet';
 
@@ -967,16 +994,17 @@ footer .mono{color:var(--ink-2)}
     <section class="hist">
       <h2>Track record</h2>
       <div class="tile">
-        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${rows.filter(r=>FINAL[String(r.id||'')]&&(FINAL[String(r.id)].vc==='hit'||FINAL[String(r.id)].vc==='miss')).length} closed of ${rows.length} runs</span></div>
+        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${ownTally.hit+ownTally.miss} closed of ${shownRuns.length} runs, last ${gDates.length} days</span></div>
         <div class="lead q">This is the final verdict on each call, taken only after its whole window has passed. The run log above carries the first look, taken a few hours earlier while the window was still open, and the two will not always agree.</div>
         <div class="bigrow">
-          <div><span class="big" style="color:var(--good)">${tally.hit}</span><span class="lbl">right</span></div>
-          <div><span class="big" style="color:var(--crit)">${tally.miss}</span><span class="lbl">wrong</span></div>
-          ${tally.unscored?'<div><span class="big" style="color:var(--dim)">'+tally.unscored+'</span><span class="lbl">could not be marked</span></div>':''}
+          <div><span class="big" style="color:var(--good)">${ownTally.hit}</span><span class="lbl">right</span></div>
+          <div><span class="big" style="color:var(--crit)">${ownTally.miss}</span><span class="lbl">wrong</span></div>
+          ${ownTally.wait?'<div><span class="big" style="color:var(--dim)">'+ownTally.wait+'</span><span class="lbl">waiting for a late close</span></div>':''}
+          ${ownTally.none?'<div><span class="big" style="color:var(--dim)">'+ownTally.none+'</span><span class="lbl">not closed yet</span></div>':''}
         </div>
-        <div class="strip">${strip}</div>
-        <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>·</b> not closed yet</span></div>
-        <div class="legendnote">An underline marks the 0700 hrs run of that day.</div>
+        ${strip}
+        <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>?</b> waiting for a late close</span><span><b>·</b> not closed yet</span></div>
+        <div class="legendnote">One row per day, newest at the top, one column per slot. Each tile shows how that run's own call held up. A red dashed outline means no run was filed for that slot; today's later slots stay blank until they run.</div>
         ${lastClose?'<div class="scorenote"><b>Last closed:</b> '+esc(lastClose.close.of)+', judged '+esc(verdictWord(lastClose.close.verdict))+(lastClose.close.note?'. '+esc(lastClose.close.note):'')+'</div>':'<div class="scorenote">No call has been closed yet. A call is only marked right or wrong once its whole window has passed, which happens about six hours after it was made.</div>'}
         <div class="foot">A call is judged only after the window it covered has finished, so tonight's readings stay unmarked until tomorrow. Interim checks taken while a window is still running are in the run log, not counted here.</div>
       </div>
