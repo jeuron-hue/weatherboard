@@ -687,13 +687,30 @@ footer .mono{color:var(--ink-2)}
     // ever HIT or MISS. Readings before 14/09/26 2116 hrs have no close, so the
     // closed count starts small and fills in over days.
     const hasClose=r=>r.close&&r.close.of&&!/^(none|n\/a|-)$/i.test(String(r.close.of));
-    const closed=rows.filter(hasClose); const tally={hit:0,miss:0,partial:0,scope:0,unscored:0};
-    closed.forEach(r=>tally[verdictClass(r.close.verdict)]++);
+    const closed=rows.filter(hasClose);
+    // 23/09/26, closes_deferred. A close that cannot be made two slots down is
+    // handed on, and a later run writes it into its closes_deferred array. The
+    // record of a call is the LAST HIT or MISS written for it anywhere, in close
+    // or in closes_deferred; an UNSCORED never overwrites a HIT or MISS. FINAL
+    // maps each closed reading id to that. The tally counts calls, not closers,
+    // so a call closed late is counted once, with its real verdict.
+    const FINAL={};
+    rows.slice().reverse().forEach(r=>{
+      const put=c=>{ if(!c||!c.of||/^(none|n\/a|-)$/i.test(String(c.of))) return;
+        const k=String(c.of), vc=verdictClass(c.verdict), prev=FINAL[k];
+        if(prev&&vc!=='hit'&&vc!=='miss'&&(prev.vc==='hit'||prev.vc==='miss')) return;
+        FINAL[k]={of:k,verdict:c.verdict,note:c.note,vc:vc,by:String(r.id||'')}; };
+      put(r.close); (Array.isArray(r.closes_deferred)?r.closes_deferred:[]).forEach(put); });
+    const tally={hit:0,miss:0,partial:0,scope:0,unscored:0};
+    Object.values(FINAL).forEach(f=>tally[f.vc]++);
+    const finalOf=r=>hasClose(r)?(FINAL[String(r.close.of)]||{vc:verdictClass(r.close.verdict),verdict:r.close.verdict,by:String(r.id||'')}):null;
+    const rowVerdict=r=>{ const f=finalOf(r); return f?f.vc:'none'; };
+    const deferredTitle=r=>(Array.isArray(r.closes_deferred)?r.closes_deferred:[]).filter(c=>c&&c.of).map(c=>'; also closed '+c.of+' late: '+verdictWord(c.verdict)).join('');
     const hasScore=r=>r.score&&r.score.of&&!/^(none|n\/a|-)$/i.test(String(r.score.of)); const scored=rows.filter(hasScore);
     const stripRows=rows.slice(0,28).reverse();
-    const strip=stripRows.map(r=>{ const v=hasClose(r)?verdictClass(r.close.verdict):'none';
+    const strip=stripRows.map(r=>{ const v=rowVerdict(r); const f=finalOf(r);
       const ch={hit:'✓',miss:'✕',partial:'~',scope:'~',unscored:'?',none:'·'}[v];
-      const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasClose(r)?' closed '+r.close.of+': '+verdictWord(r.close.verdict)+(r.close.note?' ('+r.close.note+')':''):' (closed nothing)');
+      const title=label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+(hasClose(r)?' closed '+r.close.of+': '+verdictWord(r.close.verdict)+(r.close.note?' ('+r.close.note+')':'')+(f&&f.by&&f.by!==String(r.id||'')?'; closed later by '+f.by+': '+verdictWord(f.verdict):''):' (closed nothing)')+deferredTitle(r);
       return '<div class="sq '+(v==='none'?'':(v==='scope'?'partial':v))+(r.kind==='day-ahead'?' day':'')+'" title="'+esc(title)+'">'+ch+'</div>'; }).join('');
     const lastScore=scored[0]; const lastClose=closed[0];
 
@@ -773,7 +790,7 @@ footer .mono{color:var(--ink-2)}
     // `part`, a word section 5 of the forecasting model forbids. It now counts
     // the same thing the track record counts, the closed verdicts, and says it
     // in the same words.
-    earlierRows.forEach(r=>{ if(hasClose(r)) et[verdictClass(r.close.verdict)]++; else et.none++; if(r.recovery) et.rec++; });
+    earlierRows.forEach(r=>{ if(hasClose(r)) et[rowVerdict(r)]++; else et.none++; if(r.recovery) et.rec++; });
     const earlierTally=[et.hit?et.hit+' right':'', et.miss?et.miss+' wrong':'',
                         et.none?et.none+' not closed yet':'',
                         et.rec?et.rec+' filled in by the backup':''].filter(Boolean).join(' · ')||'nothing closed yet';
@@ -950,7 +967,7 @@ footer .mono{color:var(--ink-2)}
     <section class="hist">
       <h2>Track record</h2>
       <div class="tile">
-        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${closed.length} closed of ${rows.length} runs</span></div>
+        <div class="head"><span class="eyebrow">How the calls have held up</span><span class="age">${rows.filter(r=>FINAL[String(r.id||'')]&&(FINAL[String(r.id)].vc==='hit'||FINAL[String(r.id)].vc==='miss')).length} closed of ${rows.length} runs</span></div>
         <div class="lead q">This is the final verdict on each call, taken only after its whole window has passed. The run log above carries the first look, taken a few hours earlier while the window was still open, and the two will not always agree.</div>
         <div class="bigrow">
           <div><span class="big" style="color:var(--good)">${tally.hit}</span><span class="lbl">right</span></div>
