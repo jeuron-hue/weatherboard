@@ -840,16 +840,17 @@ footer .mono{color:var(--ink-2)}
     const today=todayStr();
     const todayRows=rows.filter(r=>r.date===today);
     const earlierRows=rows.filter(r=>r.date!==today).slice(0,60);
-    const et={hit:0,miss:0,partial:0,scope:0,unscored:0,none:0,rec:0};
+    const et={hit:0,miss:0,partial:0,scope:0,unscored:0,none:0,pre:0,rec:0};
     // 15/09/26: this counted score.verdict in raw words ("38 hit - 15 part"),
     // which is a DIFFERENT measure from the track record below and printed
     // `part`, a word section 5 of the forecasting model forbids. It now counts
     // the same thing the track record counts, the closed verdicts, and says it
     // in the same words.
-    earlierRows.forEach(r=>{ const k=(()=>{ const f=FINAL[String(r.id||'')]; return !f?'none':(f.vc==='hit'||f.vc==='miss')?f.vc:'unscored'; })(); et[k]++; if(r.recovery) et.rec++; });
+    earlierRows.forEach(r=>{ const k=(()=>{ const f=FINAL[String(r.id||'')]; return !f?(Date.parse(r.ts||'')<CLOSE_START?'pre':'none'):(f.vc==='hit'||f.vc==='miss')?f.vc:'unscored'; })(); et[k]++; if(r.recovery) et.rec++; });
     const earlierTally=[et.hit?et.hit+' right':'', et.miss?et.miss+' wrong':'',
                         et.unscored?et.unscored+' waiting for a late close':'',
                         et.none?et.none+' not closed yet':'',
+                        et.pre?et.pre+' before closing began':'',
                         et.rec?et.rec+' filled in by the backup':''].filter(Boolean).join(' · ')||'nothing closed yet';
 
     // Item 3, 14/09/26: a slot that never filed used to be simply absent, so the
