@@ -359,12 +359,14 @@ footer .mono{color:var(--ink-2)}
 @media (prefers-reduced-motion: no-preference){.tile,.lean{transition:box-shadow .2s}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
+<script>try{var t=localStorage.getItem('esb-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>East Sky Board <span>· Bedok · Tampines · Changi</span></h1>
     <div class="hright">
+      <button class="dtoggle" id="ttoggle" type="button" aria-pressed="false" title="Switch light or dark"><span class="sw"></span>Dark</button>
       <button class="dtoggle" id="dtoggle" type="button" aria-pressed="false"><span class="sw"></span>Show the working</button>
       <div class="clock">SGT <b id="clock">--:--</b> hrs · <span id="date"></span></div>
     </div>
@@ -1113,6 +1115,19 @@ footer .mono{color:var(--ink-2)}
   //           two together show how stale the page has gone.
   load();
 
+})();
+</script>
+<script>
+(function(){
+  var b=document.getElementById('ttoggle'); if(!b) return;
+  var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+  function cur(){ var a=document.documentElement.getAttribute('data-theme'); return a||(mq&&mq.matches?'dark':'light'); }
+  function sync(){ var d=cur()==='dark'; b.setAttribute('aria-pressed',d?'true':'false'); b.lastChild.nodeValue=d?'Dark':'Light'; }
+  b.addEventListener('click',function(){ var n=cur()==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',n);
+    try{localStorage.setItem('esb-theme',n);}catch(e){} sync(); });
+  if(mq&&mq.addEventListener) mq.addEventListener('change',sync);
+  sync();
 })();
 </script>
 </body>
