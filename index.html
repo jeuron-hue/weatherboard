@@ -569,6 +569,15 @@ footer .mono{color:var(--ink-2)}
     return v<=50?{d:'Good',c:'good'}:v<=100?{d:'Moderate',c:'warn'}:v<=200?{d:'Unhealthy',c:'crit'}:v<=300?{d:'Very Unhealthy',c:'crit'}:{d:'Hazardous',c:'crit'}; }
   function hazeNotable(hz){ if(!hz) return false; const b=pmBand(hz.pm25_1h_east), p=psiBand(hz.psi_east);
     return (b&&b.n>=2)||(p&&p.c==='crit'); }
+  // 17/10/26, Gary: with the working hidden the haze numbers vanished, and the
+  // chip carried only the PM2.5 word ("elevated") while the 24 hr PSI read
+  // unhealthy. Still shown only when haze is notable; now it names the worse of
+  // the two with its number, PSI first once it is unhealthy or worse.
+  function hazeChip(hz){ if(!hazeNotable(hz)) return '';
+    const b=pmBand(hz.pm25_1h_east), p=psiBand(hz.psi_east), usePsi=!!(p&&p.c==='crit');
+    const txt=usePsi?'haze \u00b7 PSI '+hz.psi_east+' '+p.d:'haze \u00b7 PM2.5 '+hz.pm25_1h_east+' '+b.d;
+    const tip='East side: 1 hr PM2.5 '+(hz.pm25_1h_east!=null?hz.pm25_1h_east+' ug/m3'+(b?' ('+b.d+')':''):'not read')+', 24 hr PSI '+(hz.psi_east!=null?hz.psi_east+(p?' ('+p.d+')':''):'not read');
+    return '<span class="chip '+(usePsi?p.c:b.c)+'" title="'+esc(tip)+'">'+esc(txt)+'</span>'; }
   function ageSpan(minOrIso,base){ let ms=null;
     if(typeof minOrIso==='number') ms=minOrIso*60000+(base?Date.now()-base.getTime():0);
     else if(minOrIso) { const d=new Date(minOrIso); if(!isNaN(d)) ms=Date.now()-d.getTime(); }
@@ -929,7 +938,7 @@ footer .mono{color:var(--ink-2)}
         <div class="top">
           <span class="chip kind">${esc(label(latest))}</span>
           ${latest.recovery?'<span class="chip warn">backup run</span>':''}
-          ${hazeNotable(o.haze)?'<span class="chip '+((pmBand(o.haze.pm25_1h_east)||psiBand(o.haze.psi_east)||{c:'warn'}).c)+'">haze '+esc(((pmBand(o.haze.pm25_1h_east)||{}).d||(psiBand(o.haze.psi_east)||{}).d||'').toLowerCase())+'</span>':''}
+          ${hazeChip(o.haze)}
           <span class="mono" style="font-size:13px;color:var(--ink-2)">${dmy(latest.date)} ${esc(latest.time)} hrs</span>
           <span class="age ${age!=null?ageClass(age,9,18):''}">${age!=null?fmtAge(age)+' ago':''}</span>
           <span class="chip ${chipFor(cc)}"><span class="dot"></span>${esc(latest.conf_level||cc)}</span>
