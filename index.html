@@ -390,6 +390,7 @@ footer .mono{color:var(--ink-2)}
   const pad=n=>String(n).padStart(2,'0');
   const SGT=8*60;
   let ROWS=null, HB=undefined; // HB undefined = not loaded yet, null = absent
+  let LEDGER=undefined; // 17/11/26: calibration_ledger_summary row; undefined = not loaded, null = unreadable
   let GRID=null; // 23/09/26: light rows (id, kind, date, time, close, closes_deferred) for every reading, for the month tables
 
   // Plain by default. The technical layer is one click away and the choice sticks
@@ -426,6 +427,21 @@ footer .mono{color:var(--ink-2)}
   const VERDICTWORD={hit:'right',miss:'wrong',partial:'part of the window',
                      scope:'part of the window',unscored:'could not be marked'};
   function verdictWord(v){ return VERDICTWORD[verdictClass(v)]||'could not be marked'; }
+  // 17/11/26, board job 15. error_direction (card section 5) in plain words.
+  // 'none' and a missing value say nothing. Written at any verdict, so a
+  // right call can still carry one.
+  const DIRPLAIN={'caught-out':'rain came during a dry call','false-alarm':'rain was called and did not come',
+    'timing-early':'timing off, earlier than called','timing-late':'timing off, later than called'};
+  const DIRSHORT={'caught-out':'rain during a dry call','false-alarm':'called rain that never came','timing-early':'rain earlier than called','timing-late':'rain later than called'};
+  function dirPlain(d){ return DIRPLAIN[String(d||'').toLowerCase()]||''; }
+  // approach.frames (card section 7): {source, stamps[4]}; readings before
+  // the shape was pinned carry a bare array of stamps.
+  function framesPlain(f,date){ if(!f) return '';
+    const st=Array.isArray(f)?f:(Array.isArray(f.stamps)?f.stamps:[]); if(!st.length) return '';
+    const day=String(date||'').replace(/-/g,'');
+    const t=st.map(x=>{ x=String(x); return x.length>=12?(x.slice(0,8)!==day&&day?x.slice(6,8)+'/'+x.slice(4,6)+' ':'')+x.slice(8,12):x; }).join(', ');
+    const src=Array.isArray(f)?'':f.source==='archive'?', from the stored copies':f.source==='live'?', read live':'';
+    return t+' hrs'+src; }
   function compass(deg){ if(deg==null) return '';
     return '<svg class="compass" viewBox="0 0 16 16" aria-hidden="true"><g transform="rotate('+(deg)+' 8 8)"><path d="M8 1.5 L11 9 L8 7.5 L5 9 Z" fill="currentColor"/><path d="M8 7.5 L11 9 L8 14.5 L5 9 Z" fill="currentColor" opacity=".35"/></g></svg>'; }
   function dirName(d){ if(d==null) return ''; const n=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']; return n[Math.round(d/22.5)%16]; }
@@ -728,7 +744,7 @@ footer .mono{color:var(--ink-2)}
       const put=c=>{ if(!c||!c.of||/^(none|n\/a|-)$/i.test(String(c.of))) return;
         const k=String(c.of), vc=verdictClass(c.verdict), prev=FINAL[k];
         if(prev&&vc!=='hit'&&vc!=='miss'&&(prev.vc==='hit'||prev.vc==='miss')) return;
-        FINAL[k]={of:k,verdict:c.verdict,note:c.note,vc:vc,by:String(r.id||'')}; };
+        FINAL[k]={of:k,verdict:c.verdict,note:c.note,vc:vc,by:String(r.id||''),dir:c.error_direction}; };
       put(r.close); (Array.isArray(r.closes_deferred)?r.closes_deferred:[]).forEach(put); });
     const tally={hit:0,miss:0,partial:0,scope:0,unscored:0};
     Object.values(FINAL).forEach(f=>tally[f.vc]++);
@@ -764,7 +780,7 @@ footer .mono{color:var(--ink-2)}
     const tile=(r,d,at)=>{ if(!r&&d<firstDate) return '<div class="sq future" title="'+esc(dmy(d)+': before the readings started')+'"></div>';
       if(!r) return notDueYet(d,at)?'<div class="sq future" title="'+esc(dmy(d)+' '+at+' hrs: not run yet')+'"></div>':'<div class="sq gap" title="'+esc(dmy(d)+' '+at+' hrs: no run filed')+'"></div>';
       const o=ownK(r); const ch={hit:'✓',miss:'✕',wait:'?',none:'·',pre:'–'}[o.k];
-      const what=o.k==='pre'?'filed before closing began on 14/09':o.k==='none'?'not closed yet':o.k==='wait'?'waiting for a late close'+(o.f&&o.f.note?' ('+o.f.note+')':''):verdictWord(o.f.verdict)+', closed by '+o.f.by+(o.f.note?' ('+o.f.note+')':'');
+      const what=o.k==='pre'?'filed before closing began on 14/09':o.k==='none'?'not closed yet':o.k==='wait'?'waiting for a late close'+(o.f&&o.f.note?' ('+o.f.note+')':''):verdictWord(o.f.verdict)+(dirPlain(o.f.dir)?', '+dirPlain(o.f.dir):'')+', closed by '+o.f.by+(o.f.note?' ('+o.f.note+')':'');
       return '<div class="sq '+(o.k==='hit'||o.k==='miss'?o.k:(o.k==='pre'?'pre':''))+'" title="'+esc(label(r)+' '+dmy(r.date)+' '+r.time+' hrs'+(r.recovery?' (recovery run)':'')+': '+what)+'">'+ch+'</div>'; };
     const months=[...new Set(src.map(r=>String(r.date||'').slice(0,7)).filter(Boolean).concat([todayStr().slice(0,7)]))].sort().reverse();
     const monthTable=ym=>{ const [y,mo]=ym.split('-').map(Number); const nd=new Date(y,mo,0).getDate();
@@ -780,6 +796,17 @@ footer .mono{color:var(--ink-2)}
     const strip='<div class="mgtitle">'+esc(curM.title)+'</div>'+curM.html
       +olderM.map(m=>'<details class="mgold"><summary>'+esc(m.title)+': '+esc(tallyLine(m.t))+'</summary><div class="mgtitle">'+esc(m.title)+'</div>'+m.html+'</details>').join('');
     const lastScore=scored[0]; const lastClose=closed[0];
+    // 17/11/26, board job 15: how this month's wrong calls went wrong.
+    const missDirs={}; shownRuns.forEach(r=>{ const o=ownK(r); if(o.k!=='miss') return; const d=DIRSHORT[String(o.f.dir||'').toLowerCase()]||'not recorded'; missDirs[d]=(missDirs[d]||0)+1; });
+    const missSplit=Object.keys(missDirs).length?'<div class="lead q">How the wrong calls went wrong: '+Object.entries(missDirs).sort((a,b)=>b[1]-a[1]).map(([k,n])=>n+' '+esc(k)).join(' · ')+'.</div>':'';
+    // 17/11/26, board job 15: the running record of closing calls (card section 9).
+    const L=LEDGER;
+    const ledgerTile='<div class="tile" style="margin-top:14px"><div class="head"><span class="eyebrow">When rain was seen closing in</span>'+(L&&L.latest_close?'<span class="age">last added '+esc(dmy(String(L.latest_close).slice(0,10)))+'</span>':'')+'</div>'
+      +'<div class="qn">When the radar shows rain heading for the east, how often does it actually get here?</div>'
+      +(L===undefined?'<div class="lead q">Not read yet.</div>':!L||!L.total?'<div class="lead q">This record could not be read from the data store just now.</div>'
+        :'<div class="lead q">It arrived '+L.arrived+' times out of '+L.total+' ('+esc(L.arrived_pct)+' %). The rest faded out before reaching us ('+L.dissipated+') or passed by to one side ('+L.passed_by+').</div>'
+        +'<div class="bigrow"><div><span class="big">'+L.arrived+'</span><span class="lbl">arrived</span></div><div><span class="big">'+L.dissipated+'</span><span class="lbl">faded out</span></div><div><span class="big" style="color:var(--dim)">'+L.passed_by+'</span><span class="lbl">passed by</span></div></div>')
+      +'<div class="foot">Each line is added when a reading that saw rain closing in is judged, after its window has passed. This count, never the last case, sets how sure a reading can be when something is heading our way.</div></div>';
 
     // radar spark
     const trend=Array.isArray(rd.trend_px)?rd.trend_px:[]; const mx=Math.max(1,...trend);
@@ -882,7 +909,7 @@ footer .mono{color:var(--ink-2)}
         + '<td class="confc"><span class="chip crit">missed</span></td>'
         + '<td class="lean-cell">No reading filed for this slot. Either the run did not fire, or it fired and the step that copies it here did not.</td></tr>';
       const c=confClass(r.conf_level||r.confidence); const v=hasScore(r)?verdictClass(r.score.verdict):null;
-      return '<tr><td class="when">'+dmy(r.date)+' '+esc(r.time)+'</td><td class="kindc"><span class="chip kind">'+shortKind(r)+'</span>'+(r.recovery?' <span class="chip warn">rec</span>':'')+'</td><td class="confc"><span class="chip '+chipFor(c)+'">'+esc(r.conf_level||c)+'</span></td><td class="lean-cell"><details'+(DETAIL?' open':'')+'><summary>'+esc((r.answers&&r.answers.consequence)||r.lean||'')+'</summary><div>'+esc((r.lean&&r.answers&&r.answers.consequence?r.lean+'\n':'')+(r.confidence?'Confidence: '+r.confidence+'\n':'')+(Array.isArray(r.unresolved)?r.unresolved.map(u=>'• '+u).join('\n'):'')+(r.route?'\nRoute '+r.route:'')+(v?'\n\nFirst look at '+r.score.of+', taken while its window was still open: '+verdictWord(r.score.verdict)+(r.score.mechanism?'. '+r.score.mechanism:''):''))+'</div></details></td></tr>'; }
+      return '<tr><td class="when">'+dmy(r.date)+' '+esc(r.time)+'</td><td class="kindc"><span class="chip kind">'+shortKind(r)+'</span>'+(r.recovery?' <span class="chip warn">rec</span>':'')+'</td><td class="confc"><span class="chip '+chipFor(c)+'">'+esc(r.conf_level||c)+'</span></td><td class="lean-cell"><details'+(DETAIL?' open':'')+'><summary>'+esc((r.answers&&r.answers.consequence)||r.lean||'')+'</summary><div>'+esc((r.lean&&r.answers&&r.answers.consequence?r.lean+'\n':'')+(r.confidence?'Confidence: '+r.confidence+'\n':'')+(Array.isArray(r.unresolved)?r.unresolved.map(u=>'• '+u).join('\n'):'')+(r.route?'\nRoute '+r.route:'')+(framesPlain(r.approach&&r.approach.frames,r.date)?'\nWider radar frames used: '+framesPlain(r.approach.frames,r.date):'')+(v?'\n\nFirst look at '+r.score.of+', taken while its window was still open: '+verdictWord(r.score.verdict)+(dirPlain(r.score.error_direction)?' ('+dirPlain(r.score.error_direction)+')':'')+(r.score.mechanism?'. '+r.score.mechanism:''):''))+'</div></details></td></tr>'; }
     function logTable(rs){ if(!rs.length) return '<div class="empty">No runs filed yet today. The first is the 0700 hrs day-ahead.</div>';
       return '<div class="tablewrap"><table><thead><tr><th>Run</th><th>Kind</th><th>How sure</th><th>The call</th></tr></thead><tbody>'+rs.map(logRow).join('')+'</tbody></table></div>'; }
     const todayAll=todayRows.concat(missedToday()).sort((a,b)=>String(b.time||b.at).localeCompare(String(a.time||a.at)));
@@ -894,7 +921,7 @@ footer .mono{color:var(--ink-2)}
       + (latest.mechanism&&latest.mechanism.expected?'<p><b>Mechanism expected.</b> <span class="mono">'+esc(latest.mechanism.expected)+'</span>'+(Array.isArray(latest.mechanism.considered)&&latest.mechanism.considered.length?'. Considered: <span class="mono">'+esc(latest.mechanism.considered.join(', '))+'</span>':'')+'</p>':'')
       + (Array.isArray(latest.unresolved)&&latest.unresolved.length?'<p><b>Unresolved.</b></p><ul>'+latest.unresolved.map(u=>'<li>'+esc(u)+'</li>').join('')+'</ul>':'')
       + (latest.next_data?'<p><b>What would settle it.</b> '+esc(latest.next_data)+'</p>':'')
-      + (latest.score&&latest.score.of?'<p><b>First look at the previous run.</b> '+esc(latest.score.of)+', taken while its window was still open: '+esc(verdictWord(latest.score.verdict))+(latest.score.scope?' ('+esc(latest.score.scope)+')':'')+(latest.score.mechanism_note||latest.score.mechanism?'. '+esc(latest.score.mechanism_note||latest.score.mechanism):'')+'</p>':'')
+      + (latest.score&&latest.score.of?'<p><b>First look at the previous run.</b> '+esc(latest.score.of)+', taken while its window was still open: '+esc(verdictWord(latest.score.verdict))+(dirPlain(latest.score.error_direction)?', '+esc(dirPlain(latest.score.error_direction)):'')+(latest.score.scope?' ('+esc(latest.score.scope)+')':'')+(latest.score.mechanism_note||latest.score.mechanism?'. '+esc(latest.score.mechanism_note||latest.score.mechanism):'')+'</p>':'')
       + (latest.score&&latest.score.acted_outcome?'<p><b>What a reader acting on it got.</b> '+esc(latest.score.acted_outcome)+'</p>':'')
       + (latest.route?'<p><b>Browser route.</b> '+esc(latest.route)+'</p>':'')
       + (latest.filed?'<p><b>Full reading.</b> <span class="mono">'+esc(latest.filed)+'</span></p>':'');
@@ -924,6 +951,7 @@ footer .mono{color:var(--ink-2)}
       + wrow('Nearest Tampines', rd.tampines_km!=null?rd.tampines_km+' km, bearing '+rd.tampines_brg+'°'+(rd.tampines_label?' <small>'+esc(rd.tampines_label)+'</small>':''):'none')
       + wrow('Frame', rd.frame?esc(rd.frame)+' hrs'+(rd.trend_from?' <small>trend from '+esc(rd.trend_from)+' hrs</small>':''):'–')
       + wrow('Trend, px per frame', trend.length?trend.join(' → '):'–')
+      + wrow('Wider frames used', framesPlain(latest.approach&&latest.approach.frames,latest.date)?esc(framesPlain(latest.approach.frames,latest.date))+' <small>the four 240 km pictures the approach check measured</small>':'–')
       + (latest.onset_observed&&latest.onset_observed.first_echo?wrow('First echo overhead',['bedok','tampines','changi'].map(k=>k+' '+(hhmm(latest.onset_observed.first_echo[k])||'none')).join(', ')):'')
       + '</div>'
       + '<p>50 km product, 217 by 120 px covering about 63 by 35 km, one pixel about 0.29 km. Bands run cyan, green, yellow, orange, red, magenta. A peak band resting on one or two pixels is speckle and is not named. Radar sees rain aloft, which does not always reach the ground.</p>';
@@ -1044,12 +1072,14 @@ footer .mono{color:var(--ink-2)}
           ${ownTally.wait?'<div><span class="big" style="color:var(--dim)">'+ownTally.wait+'</span><span class="lbl">waiting for a late close</span></div>':''}
           ${ownTally.none?'<div><span class="big" style="color:var(--dim)">'+ownTally.none+'</span><span class="lbl">not closed yet</span></div>':''}
         </div>
+        ${missSplit}
         ${strip}
         <div class="legend"><span><b>✓</b> right</span><span><b>✕</b> wrong</span><span><b>?</b> waiting for a late close</span><span><b>·</b> not closed yet</span><span><b>–</b> before closing began, 14/09</span></div>
         <div class="legendnote">One row per slot, one column per day of the month. Each tile shows how that run's own call held up. A red dashed outline means no run was filed for that slot; slots still to come stay blank. Earlier months fold away below the table.</div>
-        ${lastClose?'<div class="scorenote"><b>Last closed:</b> '+esc(lastClose.close.of)+', judged '+esc(verdictWord(lastClose.close.verdict))+(lastClose.close.note?'. '+esc(lastClose.close.note):'')+'</div>':'<div class="scorenote">No call has been closed yet. A call is only marked right or wrong once its whole window has passed, which happens about six hours after it was made.</div>'}
+        ${lastClose?'<div class="scorenote"><b>Last closed:</b> '+esc(lastClose.close.of)+', judged '+esc(verdictWord(lastClose.close.verdict))+(dirPlain(lastClose.close.error_direction)?', '+esc(dirPlain(lastClose.close.error_direction)):'')+(lastClose.close.note?'. '+esc(lastClose.close.note):'')+'</div>':'<div class="scorenote">No call has been closed yet. A call is only marked right or wrong once its whole window has passed, which happens about six hours after it was made.</div>'}
         <div class="foot">A call is judged only after the window it covered has finished, so tonight's readings stay unmarked until tomorrow. Interim checks taken while a window is still running are in the run log, not counted here.</div>
       </div>
+      ${ledgerTile}
     </section>
 
     ${healthSection(rows,latest)}`;
@@ -1089,6 +1119,9 @@ footer .mono{color:var(--ink-2)}
       // light rows for the month tables: every reading, only the fields the grid needs
       try{ const g=await fetch(SB_URL+'/rest/v1/readings?select=id,ts,kind:doc->>kind,date:doc->>date,time:doc->>time,recovery:doc->recovery,close:doc->close,closes_deferred:doc->closes_deferred&order=ts.desc&limit=1000',{headers:SB_H,cache:'no-store'});
         GRID=g.ok?(await g.json()).filter(x=>x&&x.id):null; }catch(e){ GRID=null; }
+      // 17/11/26: the closing-call record; a failure here never stops the page
+      try{ const lq=await fetch(SB_URL+'/rest/v1/calibration_ledger_summary?select=*',{headers:SB_H,cache:'no-store'});
+        LEDGER=lq.ok?((await lq.json())[0]||null):null; }catch(e){ LEDGER=null; }
       if(!r.ok) throw new Error('readings HTTP '+r.status);
       if(!m.ok) throw new Error('meta HTTP '+m.status);
       const rows=await r.json(), meta=await m.json();
